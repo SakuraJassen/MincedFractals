@@ -1,7 +1,7 @@
 FileVersion = 1
 LastConfig = "Debug"
 LastPlatform = "Win64"
-RecentFilesList = ["src\\Entity\\FractelChunkMultiThread.bf", "src\\Rendering.bf", "c:\\Program Files\\BeefLang\\Projects\\BasicEngine\\src\\Camara\\SDLCamera.bf", "Disassembly", "c:\\Program Files\\BeefLang\\Projects\\BasicEngine\\src\\Engine.bf", "c:\\Program Files\\BeefLang\\Projects\\BasicEngine\\src\\GameStates\\GameState.bf", "Disassembly", "c:\\Program Files\\BeefLang\\BeefLibs\\corlib\\src\\Runtime.bf", "c:\\Program Files\\BeefLang\\BeefLibs\\corlib\\src\\Collections\\List.bf", "c:\\Program Files\\BeefLang\\Projects\\BasicEngine\\src\\HUD\\Label.bf", "c:\\Program Files\\BeefLang\\Projects\\BasicEngine\\src\\Rendering\\DrawUtils.bf", "src\\ScreenPixelManage.bf", "c:\\Program Files\\BeefLang\\BeefLibs\\corlib\\src\\Result.bf", "c:\\Program Files\\BeefLang\\BeefLibs\\SDL2\\src\\SDLApp.bf", "c:\\Program Files\\BeefLang\\Projects\\BasicEngine\\src\\Mixins.bf", "c:\\Program Files\\BeefLang\\BeefLibs\\corlib\\src\\System.bf", "c:\\Program Files\\BeefLang\\Projects\\BasicEngine\\src\\HUD\\HUDComponent.bf", "c:\\Program Files\\BeefLang\\Projects\\BasicEngine\\src\\Entity\\Entity.bf", "c:\\Program Files\\BeefLang\\Projects\\BasicEngine\\src\\HUD\\DataLabel.bf", "c:\\Program Files\\BeefLang\\BeefLibs\\corlib\\src\\Object.bf"]
+RecentFilesList = ["src\\Rendering.bf"]
 
 [MainWindow]
 X = 373
@@ -42,148 +42,13 @@ DefaultDocumentsTabbedView = true
 Type = "TabbedView"
 
 [[MainDockingFrame.DockedWidgets.DockedWidgets.Tabs]]
-TabLabel = "Runtime.bf"
-TabWidth = 92.0
-Type = "SourceViewPanel"
-FilePath = "c:\\Program Files\\BeefLang\\BeefLibs\\corlib\\src\\Runtime.bf"
-CursorPos = 8305
-VertPos = 5531.0
-ProjectName = "corlib"
-
-[[MainDockingFrame.DockedWidgets.DockedWidgets.Tabs]]
-TabLabel = "List.bf"
-TabWidth = 64.0
-Type = "SourceViewPanel"
-FilePath = "c:\\Program Files\\BeefLang\\BeefLibs\\corlib\\src\\Collections\\List.bf"
-CursorPos = 3784
-ProjectName = "corlib"
-
-[[MainDockingFrame.DockedWidgets.DockedWidgets.Tabs]]
-TabLabel = "ScreenPixelManage.bf"
-TabWidth = 158.0
-Type = "SourceViewPanel"
-FilePath = "src\\ScreenPixelManage.bf"
-CursorPos = 585
-ProjectName = "FractelOPOP"
-
-[[MainDockingFrame.DockedWidgets.DockedWidgets.Tabs]]
-TabLabel = "Result.bf"
-TabWidth = 80.0
-Type = "SourceViewPanel"
-FilePath = "c:\\Program Files\\BeefLang\\BeefLibs\\corlib\\src\\Result.bf"
-CursorPos = 1306
-ProjectName = "corlib"
-
-[[MainDockingFrame.DockedWidgets.DockedWidgets.Tabs]]
-TabLabel = "HUDComponent.bf"
-TabWidth = 140.0
-Type = "SourceViewPanel"
-FilePath = "c:\\Program Files\\BeefLang\\Projects\\BasicEngine\\src\\HUD\\HUDComponent.bf"
-CursorPos = 476
-ProjectName = "BasicEngine"
-
-[[MainDockingFrame.DockedWidgets.DockedWidgets.Tabs]]
-TabLabel = "Entity.bf"
-TabWidth = 76.0
-Type = "SourceViewPanel"
-FilePath = "c:\\Program Files\\BeefLang\\Projects\\BasicEngine\\src\\Entity\\Entity.bf"
-CursorPos = 2689
-ProjectName = "BasicEngine"
-
-[[MainDockingFrame.DockedWidgets.DockedWidgets.Tabs]]
-TabLabel = "GameState.bf"
-TabWidth = 108.0
-Type = "SourceViewPanel"
-FilePath = "c:\\Program Files\\BeefLang\\Projects\\BasicEngine\\src\\GameStates\\GameState.bf"
-CursorPos = 3142
-ProjectName = "BasicEngine"
-
-[[MainDockingFrame.DockedWidgets.DockedWidgets.Tabs]]
-TabLabel = "SDLApp.bf"
-TabWidth = 91.0
-Type = "SourceViewPanel"
-FilePath = "c:\\Program Files\\BeefLang\\BeefLibs\\SDL2\\src\\SDLApp.bf"
-CursorPos = 416
-ProjectName = "SDL2"
-
-[[MainDockingFrame.DockedWidgets.DockedWidgets.Tabs]]
-TabLabel = "System.bf"
-TabWidth = 86.0
-Type = "SourceViewPanel"
-FilePath = "c:\\Program Files\\BeefLang\\BeefLibs\\corlib\\src\\System.bf"
-CursorPos = 2583
-ProjectName = "corlib"
-
-[[MainDockingFrame.DockedWidgets.DockedWidgets.Tabs]]
-TabLabel = "DrawUtils.bf"
-TabWidth = 100.0
-Type = "SourceViewPanel"
-FilePath = "c:\\Program Files\\BeefLang\\Projects\\BasicEngine\\src\\Rendering\\DrawUtils.bf"
-CursorPos = 4534
-ProjectName = "BasicEngine"
-
-[[MainDockingFrame.DockedWidgets.DockedWidgets.Tabs]]
-TabLabel = "Disassembly"
-TabWidth = 122.0
-Type = "DisassemblyPanel"
-
-[[MainDockingFrame.DockedWidgets.DockedWidgets.Tabs]]
-TabLabel = "Object.bf"
-TabWidth = 83.0
-Type = "SourceViewPanel"
-FilePath = "c:\\Program Files\\BeefLang\\BeefLibs\\corlib\\src\\Object.bf"
-CursorPos = 1731
-ProjectName = "corlib"
-
-[[MainDockingFrame.DockedWidgets.DockedWidgets.Tabs]]
-TabLabel = "DataLabel.bf"
-TabWidth = 103.0
-Type = "SourceViewPanel"
-FilePath = "c:\\Program Files\\BeefLang\\Projects\\BasicEngine\\src\\HUD\\DataLabel.bf"
-CursorPos = 315
-ProjectName = "BasicEngine"
-
-[[MainDockingFrame.DockedWidgets.DockedWidgets.Tabs]]
-TabLabel = "Mixins.bf"
-TabWidth = 82.0
-Type = "SourceViewPanel"
-FilePath = "c:\\Program Files\\BeefLang\\Projects\\BasicEngine\\src\\Mixins.bf"
-CursorPos = 455
-ProjectName = "BasicEngine"
-
-[[MainDockingFrame.DockedWidgets.DockedWidgets.Tabs]]
-TabLabel = "Engine.bf"
-TabWidth = 84.0
-Type = "SourceViewPanel"
-FilePath = "c:\\Program Files\\BeefLang\\Projects\\BasicEngine\\src\\Engine.bf"
-CursorPos = 9440
-ProjectName = "BasicEngine"
-
-[[MainDockingFrame.DockedWidgets.DockedWidgets.Tabs]]
-TabLabel = "Label.bf"
-TabWidth = 76.0
-Type = "SourceViewPanel"
-FilePath = "c:\\Program Files\\BeefLang\\Projects\\BasicEngine\\src\\HUD\\Label.bf"
-CursorPos = 1760
-ProjectName = "BasicEngine"
-
-[[MainDockingFrame.DockedWidgets.DockedWidgets.Tabs]]
 Active = true
-TabLabel = "FractelChunkMultiThread.bf"
-TabWidth = 188.0
-Type = "SourceViewPanel"
-FilePath = "src\\Entity\\FractelChunkMultiThread.bf"
-CursorPos = 11571
-VertPos = 7144.0
-ProjectName = "FractelOPOP"
-
-[[MainDockingFrame.DockedWidgets.DockedWidgets.Tabs]]
 TabLabel = "Rendering.bf"
 TabWidth = 105.0
 Type = "SourceViewPanel"
 FilePath = "src\\Rendering.bf"
-CursorPos = 7612
-VertPos = 5208.375
+CursorPos = 8041
+VertPos = 5263.0
 ProjectName = "FractelOPOP"
 
 [[MainDockingFrame.DockedWidgets]]
@@ -195,7 +60,7 @@ SplitType = 1
 [[MainDockingFrame.DockedWidgets.DockedWidgets]]
 RequestedWidth = 250.0
 RequestedHeight = 250.0
-SizePriority = 0.6104526
+SizePriority = 0.5258621
 Type = "TabbedView"
 
 [[MainDockingFrame.DockedWidgets.DockedWidgets.Tabs]]
@@ -221,7 +86,7 @@ TabLabel = "Watch"
 TabWidth = 86.0
 Type = "WatchPanel"
 Columns = [{Width = 338.0}, {Width = 346.0}, {Width = 216.0}]
-Items = ["0x26F'49B859A0", "0x275'95785980", "fc.lastRenderingTime", "timerLabels[0].mStringPointer", "timerLabels[1].mStringPointer", "timerLabels[2].mStringPointer", "fc.LastRenderingTimes[0]", ""]
+Items = ["0x26F'49B859A0", "0x275'95785980", "fc.lastRenderingTime", "timerLabels[0].mStringPointer", "timerLabels[1].mStringPointer", "timerLabels[2].mStringPointer", "fc.LastRenderingTimes[0]", "lImages", ""]
 
 [[MainDockingFrame.DockedWidgets.DockedWidgets.Tabs]]
 TabLabel = "Auto"
@@ -232,10 +97,11 @@ Columns = [{Width = 216.0}, {Width = 726.0}, {Width = 216.0}]
 [[MainDockingFrame.DockedWidgets.DockedWidgets]]
 RequestedWidth = 250.0
 RequestedHeight = 250.0
-SizePriority = 0.3895474
+SizePriority = 0.4741379
 Type = "TabbedView"
 
 [[MainDockingFrame.DockedWidgets.DockedWidgets.Tabs]]
+Active = true
 TabLabel = "Find Results"
 TabWidth = 119.0
 Type = "FindResultsPanel"
@@ -246,7 +112,6 @@ TabWidth = 97.0
 Type = "ThreadPanel"
 
 [[MainDockingFrame.DockedWidgets.DockedWidgets.Tabs]]
-Active = true
 TabLabel = "Call Stack"
 TabWidth = 105.0
 Type = "CallStackPanel"
@@ -262,11 +127,46 @@ Line = 112
 Column = 4
 
 [[Breakpoints]]
+File = "c:\\Program Files\\BeefLang\\BeefLibs\\SDL2\\src\\SDLApp.bf"
+Line = 20
+Column = 5
+
+[[Breakpoints]]
 File = "src\\Entity\\FractelChunkMultiThread.bf"
-Line = 233
+Line = 265
 Column = 4
 
 [[Breakpoints]]
-File = "c:\\Program Files\\BeefLang\\Projects\\BasicEngine\\src\\Mixins.bf"
-Line = 17
-Column = 0
+File = "c:\\Program Files\\BeefLang\\Projects\\BasicEngine\\src\\Rendering\\DrawUtils.bf"
+Line = 157
+Column = 4
+
+[[Breakpoints]]
+File = "c:\\Program Files\\BeefLang\\Projects\\BasicEngine\\src\\Rendering\\DrawUtils.bf"
+Line = 151
+Column = 4
+
+[[Breakpoints]]
+File = "src\\Entity\\FractelChunkMultiThread.bf"
+Line = 242
+Column = 4
+
+[[Breakpoints]]
+File = "src\\Entity\\FractelChunkMultiThread.bf"
+Line = 71
+Column = 5
+
+[[Breakpoints]]
+File = "src\\Entity\\FractelChunkMultiThread.bf"
+Line = 262
+Column = 4
+
+[[Breakpoints]]
+File = "c:\\Program Files\\BeefLang\\BeefLibs\\SDL2\\src\\SDLApp.bf"
+Line = 182
+Column = 4
+
+[[Breakpoints]]
+File = "src\\Entity\\FractelChunkMultiThread.bf"
+Line = 116
+Column = 4

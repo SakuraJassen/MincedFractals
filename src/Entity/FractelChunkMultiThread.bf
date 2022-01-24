@@ -21,10 +21,10 @@ namespace FractelOPOP.Entity
 		private double xMin = -2.0;// Default minimum X for the set to render.
 		private double xMax = 1.0;// Default maximum X for the set to render.
 		public double xOffset = 0;// Default maximum X for the set to render.
-		private int32 kMax = 50;
+		private double kMax = 50;
 		private int32 xyPixelStep = 4;
 		private int32 numColours = 85;// Default number of colours to use in colour table.
-		private float zoomScale = 1;// Default amount to zoom in by.
+		private double zoomScale = 1;// Default amount to zoom in by.
 
 		private ColourTable colourTable = null ~ SafeDelete!(_);// Colour table.
 
@@ -74,18 +74,19 @@ namespace FractelOPOP.Entity
 				lImages[i] = image;
 			}
 
-			mRenderThreads.Add(new Thread(new () => RenderImageOne()));
-			mRenderThreads.Add(new Thread(new () => RenderImageTwo()));
-			mRenderThreads.Add(new Thread(new () => RenderImageThree()));
-			mRenderThreads.Add(new Thread(new () => RenderImageFour()));
+			//mRenderThreads.Add(new Thread((ParameterizedThreadStart)new (pixelStep) => RenderImageByPixel((int32)pixelStep)));
+			mRenderThreads.Add(new Thread(new () => RenderImage1()));
+			mRenderThreads.Add(new Thread(new () => RenderImage2()));
+			mRenderThreads.Add(new Thread(new () => RenderImage3()));
+			mRenderThreads.Add(new Thread(new () => RenderImage4()));
 			mRenderThreads.Add(new Thread(new () => RenderImage5()));
 
 			mThreadEnabled = new bool[8];
 			mThreadEnabled[0] = true;
-			mThreadEnabled[2] = false;
-			mThreadEnabled[4] = false;
+			mThreadEnabled[1] = true;
+			mThreadEnabled[3] = true;
 
-			SafeMemberSet!(colourTable, new ColourTable(10000, 10000));
+			SafeMemberSet!(colourTable, new ColourTable(10000 * 2, 10000 * 2));
 		}
 
 		public this(Vector2D chunkPos, Size2D size, int pixelStep = 1, int zoomS = 1)
@@ -100,26 +101,35 @@ namespace FractelOPOP.Entity
 			mSize = size;
 		}
 
+		public ~this()
+		{
+			for (var i in ..<mThreadEnabled.Count)
+			{
+				mThreadEnabled[i] = false;
+			}
+			while (!RenderingDone)
+			{
+				SDL.Delay(10);// Wait for the threads to terminate before we free the resources.
+			}
+		}
 		public void Draw()
 		{
 			Vector2D projectedPos = gGameApp.mCam.GetProjected(scope Vector2D(0, mSize.Height / 1000));
 			defer delete projectedPos;
-			Image drawImage = Volatile.Read<Image>(ref mCurrentImage);
-			for (var i in ..<mRenderThreads.Count)
+			/*for (var i in ..<mRenderThreads.Count)
 			{
-				if (mRenderThreads[i].IsAlive == false)
+				if (mThreadEnabled[i] && mRenderThreads[i].IsAlive == false)
 				{
-					mCurrentImage = Volatile.Read<Image>(ref lImages[i + 1]);
+					//mCurrentImage = Volatile.Read<Image>(ref lImages[i + 1]);
 					break;//Volatile.Read<Image>(ref mCurrentImage);
 				}
-			}
-
+			}*/
+			//mCurrentImage should always be a ref to the last Image that got completely rendered.
 			if (mCurrentImage?.mTexture == null)
 				return;
 			gEngineApp.Draw(mCurrentImage, projectedPos.mX, projectedPos.mY, 0f, gGameApp.mCam.mSize);//mPos.mX, mPos.mY, mDrawAngle);
 		}
 
-		bool deletingOldImages = false;
 		public void PreperRenderImages()
 		{
 			List<bool> lbool = scope List<bool>();
@@ -137,23 +147,7 @@ namespace FractelOPOP.Entity
 			{
 				mThreadEnabled[i] = lbool[i];
 			}
-			deletingOldImages = true;
-			SDL.Delay(200);
-			//var images = Volatile.Read<Image[]>(ref lImages);
 
-			/*for (var i in ..<images.Count)
-			{
-				SafeDelete!(images[i]);
-				images[i] = null;
-				SDL2.Image image = new Image();
-				if (DrawUtils.CreateTexture(image, mSize, gEngineApp.mRenderer, .Streaming) case .Err(let err))
-				{
-					SDLError!(1);
-				}
-				images[i] = image;
-			}*/
-
-			deletingOldImages = false;
 
 			for (var i in ..<mRenderThreads.Count)
 			{
@@ -168,17 +162,6 @@ namespace FractelOPOP.Entity
 					t.Start(false);
 				}
 			}
-			{
-				/*for (var i in ..<mRenderThreads.Count)
-				{
-					DeleteAndNullify!(mRenderThreads[i]);
-				}
-				mRenderThreads.Clear();
-
-				mRenderThreads.Add(new Thread(new () => RenderImageOne()));
-				mRenderThreads.Add(new Thread(new () => RenderImageThree()));
-				mRenderThreads.Add(new Thread(new () => RenderImage5()));*/
-			}
 		}
 
 		public void RenderImageByPixel(int32 pixelStep)
@@ -190,37 +173,28 @@ namespace FractelOPOP.Entity
 			case .Err(let err):
 				return;
 			case .Ok(let retImage):
-				int cnt = 0;
-				/*while (savingImage || deletingOldImages)
-				{
-					SDL.Delay(1);
-					if (++cnt > 300)
-					{
-						break;
-					}
-				}
-				savingImage = true;
-				var img = Volatile.Read<Image>(ref mCurrentImage);
-				var imgList = Volatile.Read<Image[]>(ref lImages);
-				imgList.Add(img);
-				Volatile.Write<Image>(ref mCurrentImage, ret);
-				savingImage = false;*/
+				Volatile.Write<Image>(ref mCurrentImage, images);
 			}
+
+			Logger.Debug(StackStringFormat!("{} : {}", pixelStep, TimeSpan(LastRenderingTimes[pixelStep])));
 		}
 
-		public void RenderImageOne()
+		public void RenderImage1()
 		{
 			RenderImageByPixel(1);
 		}
-		public void RenderImageTwo()
+
+		public void RenderImage2()
 		{
 			RenderImageByPixel(2);
 		}
-		public void RenderImageThree()
+
+		public void RenderImage3()
 		{
 			RenderImageByPixel(3);
 		}
-		public void RenderImageFour()
+
+		public void RenderImage4()
 		{
 			RenderImageByPixel(4);
 		}
@@ -321,10 +295,6 @@ namespace FractelOPOP.Entity
 						modulusSquared = zkx * zkx + zky * zky;
 
 						k++;
-						if (k >= kMax)
-						{
-							NOP!();
-						}
 					} while ((modulusSquared <= 4.0) && (k < kMax));
 
 					if (k < kMax)
@@ -335,14 +305,16 @@ namespace FractelOPOP.Entity
 						}
 						else
 						{
-							/*double colourIndex = ((double)k) / kMax;
+#if TRUE_COLOR
+							double colourIndex = ((double)k) / kMax;
 							double hue = Math.Pow(colourIndex, 0.25);
 
-							color = ColourTable.ColorFromHSLA(hue, 0.9, 0.6);*/
-
-							color = colourTable.GetColour(k);
+							color = ColourTable.ColorFromHSLA(hue, 0.9, 0.6);
+#else
+							color = colourTable.GetColour(k * 4);
 							colorLast = color;
 							kLast = k;
+#endif
 						}
 
 						//SDL.SetRenderDrawColor(gEngineApp.mRenderer, color.r, color.g, color.b, color.a);
@@ -384,15 +356,15 @@ namespace FractelOPOP.Entity
 					xPix += pixelStep;
 				}
 				yPix -= pixelStep;
-				if (yPix < 0)
+				/*if (yPix < 0)
 				{
 					sw.Stop();
 					logCurrentTime(sw.ElapsedMicroseconds, pixelStep);
 
 					SDL.UnlockTexture(image.mTexture);
-					return .Ok(image);
-				}
-				if (sw.ElapsedMicroseconds - getCurrentTime(pixelStep) >= 1000000)
+					return .Ok(null);
+				}*/
+				if (sw.ElapsedMicroseconds - getCurrentTime(pixelStep) >= 100000)
 				{
 					logCurrentTime(sw.ElapsedMicroseconds, pixelStep);
 				}
@@ -408,7 +380,6 @@ namespace FractelOPOP.Entity
 		void logCurrentTime(int64 renderingTime, int pixelStep)
 		{
 			Volatile.Write<int64>(ref lastRenderingTime[pixelStep], renderingTime);
-			Logger.Debug(StackStringFormat!("{} : {}", pixelStep, TimeSpan(renderingTime)));
 		}
 
 		int64 getCurrentTime(int pixelStep)

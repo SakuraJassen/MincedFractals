@@ -20,56 +20,39 @@ namespace FractelOPOP
 		private FractelChunkMultiThread fc = null ~ SafeDelete!(_);
 		private KeyboardManager kbManager = new KeyboardManager() ~ SafeDelete!(_);
 		//private FractelChunk fc = null ~ SafeDelete!(_);
-		private double zoom = 1;
-		bool mLiveUpdate = false;
+		bool liveUpdate = false;
+
+		overlayType showLabels = .reduce;
+		enum overlayType : int
+		{
+			off = 0,
+			all = 1,
+			reduce = 2,
+			superReduce = 3,
+
+		}
+
+		bool rerender = false;
 
 		List<DataLabel<int64>> timerLabels = new List<DataLabel<int64>>() ~ DeleteContainerAndItems!(_);
+		List<DataLabel<double>> graphDiscriptionsLabel = new List<DataLabel<double>>() ~ DeleteContainerAndItems!(_);
 		DataLabel<bool> statusLabel = null ~ DeleteAndNullify!(_);
 		bool lastStatus = false;
 		Image lastStatusString = null ~ SafeDelete!(_);
+
 		public this()
 		{
-			for (var y in -1 ... 1)
-			{
-				for (var x in -1 ... 1)
-				{
-					//fcList.Add(new FractelChunk(new .(x, y), new .(gGameApp.mScreen.w / 2, gGameApp.mScreen.h / 2), 1));
-				}
-			}
 			fc = new FractelChunkMultiThread(new .(gGameApp.mScreen.w, gGameApp.mScreen.h), -1.12, 1.12, -2.0, 0.47, 2, 200);
-			//fc = new FractelChunk(new .(gGameApp.mScreen.w * 2, gGameApp.mScreen.h * 2), -2, 2, -2, 2, 2, 400);
 
-			for (var i in ..<fc.mRenderThreads.Count)
-			{
-				//var label = new DataLabel<int64>(&fc.LastRenderingTimes[i + 1], 4, 4 + (28 * (i + 1)));
-				//timerLabels.Add(label);
-			}
-			/*
-			timerLabels.Add(new DataLabel<int64>(&fc.LastRenderingTimes[1], 4, 4 + (28 * 1)));
-			timerLabels.Add(new DataLabel<int64>(&fc.LastRenderingTimes[3], 4, 4 + (28 * 2)));
-			timerLabels.Add(new DataLabel<int64>(&fc.LastRenderingTimes[5], 4, 4 + (28 * 3)));*/
-			statusLabel = new DataLabel<bool>(null, 4, 4 + (28 * (fc.mRenderThreads.Count + 1)));
-			//statusLabel.[Friend]mformatString = "Rendering Done: {}";
-
-			for (var label in timerLabels)
-			{
-				label.AutoUpdate = false;
-				label.UpdateString(0, true);
-			}
+			setUpHud();
 
 			fc.PreperRenderImages();
-			/*for (var fc in fc)
-			{
-				Logger.Debug(StackStringFormat!("{} / {}", (++cnt), fc.Count));
-				fc.PreperRenderImages();
-			}*/
-			//RenderAsVideo();
-
 
 			kbManager.AddKey(.KpMinus, new (delta) =>
 				{
 					fc.[Friend]zoomScale = fc.[Friend]zoomScale / (1.25f * delta);
 					Logger.Info("zoom", fc.[Friend]zoomScale);
+					rerender = true;
 					return 20;
 				});
 
@@ -77,6 +60,7 @@ namespace FractelOPOP
 				{
 					fc.[Friend]zoomScale *= 1.25f * delta;
 					Logger.Info("zoom", fc.[Friend]zoomScale);
+					rerender = true;
 					return 20;
 				});
 
@@ -84,6 +68,7 @@ namespace FractelOPOP
 				{
 					fc.[Friend]yOffset -= (delta * 0.5) / fc.[Friend]zoomScale;
 					Logger.Info("y", fc.[Friend]yOffset);
+					rerender = true;
 					return 20;
 				});
 
@@ -91,6 +76,7 @@ namespace FractelOPOP
 				{
 					fc.[Friend]yOffset += (delta * 0.5) / fc.[Friend]zoomScale;
 					Logger.Info("y", fc.[Friend]yOffset);
+					rerender = true;
 					return 20;
 				});
 
@@ -98,6 +84,7 @@ namespace FractelOPOP
 				{
 					fc.[Friend]xOffset -= (delta * 0.5) / fc.[Friend]zoomScale;
 					Logger.Info("x", fc.[Friend]xOffset);
+					rerender = true;
 					return 20;
 				});
 
@@ -105,6 +92,7 @@ namespace FractelOPOP
 				{
 					fc.[Friend]xOffset += (delta * 0.5) / fc.[Friend]zoomScale;
 					Logger.Info("x", fc.[Friend]xOffset);
+					rerender = true;
 					return 20;
 				});
 
@@ -114,6 +102,7 @@ namespace FractelOPOP
 					fc.[Friend]yOffset = 0;
 					fc.[Friend]zoomScale = 1;
 					Logger.Info("reset", fc.[Friend]xOffset);
+					rerender = true;
 					return 20;
 				});
 
@@ -124,14 +113,26 @@ namespace FractelOPOP
 				});
 			kbManager.AddKey(.B, new (delta) =>
 				{
-					mLiveUpdate = !mLiveUpdate;
-					Logger.Info("mLiveUpdate", mLiveUpdate);
+					liveUpdate = !liveUpdate;
+					Logger.Info("mLiveUpdate", liveUpdate);
 					return 20;
 				});
-			kbManager.AddKey(.F, new (delta) =>
+
+
+			kbManager.AddKey(.H, new (delta) =>
 				{
-					gGameApp.mCam.Reset();
-					return 20;
+					if (delta == KeyboardManager.DELTA_Shift)
+						showLabels--;
+					else
+						showLabels++;
+
+					if (showLabels > overlayType.superReduce)
+						showLabels = .off;
+					else if (showLabels < 0)
+						showLabels = .superReduce;
+
+					Logger.Info("hideLabels", showLabels);
+					return 21;
 				});
 
 			kbManager.AddKey(.Kp1, new (delta) =>
@@ -188,6 +189,78 @@ namespace FractelOPOP
 
 		private void setUpHud()
 		{
+			int rowIndex = 0;
+			{
+				var label = new DataLabel<double>(&fc.[Friend]yMin, 4, 4 + (28 * (rowIndex++ + 1)));
+				label.[Friend]mformatString = "yMin: {0:00}";
+				label.ForceUpdateString();
+				label.GroupId = 1;
+				graphDiscriptionsLabel.Add(label);
+			}
+			{
+				var label = new DataLabel<double>(&fc.[Friend]yMax, 4, 4 + (28 * (rowIndex++ + 1)));
+				label.[Friend]mformatString = "yMax: {0:0}";
+				label.ForceUpdateString();
+				label.GroupId = 1;
+				graphDiscriptionsLabel.Add(label);
+			}
+			{
+				var label = new DataLabel<double>(&fc.[Friend]xMin, 4, 4 + (28 * (rowIndex++ + 1)));
+				label.[Friend]mformatString = "xMin: {0:0}";
+				label.ForceUpdateString();
+				label.GroupId = 1;
+				graphDiscriptionsLabel.Add(label);
+			}
+			{
+				var label = new DataLabel<double>(&fc.[Friend]xMax, 4, 4 + (28 * (rowIndex++ + 1)));
+				label.[Friend]mformatString = "xMax: {0:0}";
+				label.GroupId = 1;
+				label.ForceUpdateString();
+				graphDiscriptionsLabel.Add(label);
+			}
+			{
+				var label = new DataLabel<double>(&fc.[Friend]kMax, 4, 4 + (28 * (rowIndex++ + 1)));
+				label.[Friend]mformatString = "kMax: {0:00}";
+				label.GroupId = 1;
+				label.ForceUpdateString();
+				graphDiscriptionsLabel.Add(label);
+			}
+			{
+				var label = new DataLabel<double>(&fc.[Friend]yOffset, 4, 4 + (28 * (rowIndex++ + 1)));
+				label.[Friend]mformatString = "yOffset: {}";
+				label.GroupId = 2;
+				label.ForceUpdateString();
+				graphDiscriptionsLabel.Add(label);
+			}
+			{
+				var label = new DataLabel<double>(&fc.[Friend]xOffset, 4, 4 + (28 * (rowIndex++ + 1)));
+				label.[Friend]mformatString = "xOffset: {}";
+				label.GroupId = 2;
+				label.ForceUpdateString();
+				graphDiscriptionsLabel.Add(label);
+			}
+			{
+				var label = new DataLabel<double>(&fc.[Friend]zoomScale, 4, 4 + (28 * (rowIndex++ + 1)));
+				label.[Friend]mformatString = "zoomScale: {}";
+				label.GroupId = 2;
+				label.ForceUpdateString();
+				graphDiscriptionsLabel.Add(label);
+			}
+			rowIndex++;
+			for (var i in ..<fc.mRenderThreads.Count)
+			{
+				var label = new DataLabel<int64>(&fc.LastRenderingTimes[i + 1], 4, 4 + (28 * (rowIndex++ + 1)));
+				label.GroupId = 3;
+				label.AutoUpdate = false;
+
+				label.ForceUpdateString();
+				timerLabels.Add(label);
+			}
+
+
+			statusLabel = new DataLabel<bool>(null, 4, 4 + (28 * (rowIndex++ + 1)));
+			statusLabel.[Friend]mformatString = "Rendering Done: {}";
+			statusLabel.GroupId = 3;
 		}
 
 		private void RenderAsVideo()
@@ -222,17 +295,25 @@ namespace FractelOPOP
 				label.Draw(dt);
 				//if (label.[Friend]mLastStringValue != fc.LastRenderingTimes[i])
 			}*/
-			for (var label in timerLabels)
+			if (showLabels > 0)
 			{
-				label.Draw(dt);
-			}
-			//statusLabel.Draw(dt);
-			if (lastError != SDL.GetError())
-			{
-				lastError = SDL.GetError();
-				if (*lastError != (char8)0)
+				for (var label in timerLabels)
 				{
-					Logger.Error(scope String(lastError));
+					label.Draw(dt);
+				}
+
+				for (var label in graphDiscriptionsLabel)
+				{
+					label.Draw(dt);
+				}
+				statusLabel.Draw(dt);
+				if (lastError != SDL.GetError())
+				{
+					lastError = SDL.GetError();
+					if (*lastError != (char8)0)
+					{
+						Logger.Error(scope String(lastError));
+					}
 				}
 			}
 		}
@@ -241,34 +322,56 @@ namespace FractelOPOP
 		{
 			base.Update(dt);
 
-			//statusLabel.UpdateString(fc.RenderingDone);
-			for (var i in ..<timerLabels.Count)
+			if (showLabels > 0)
 			{
-				var label = timerLabels[i];
-				if (fc.mThreadEnabled[i])
-				{
-					if (label.UpdateString())
-					{
-						var str = new System.String();
-						str.AppendF("{}(R:{}) : {}", i + 1, fc.mRenderThreads[i].IsAlive,
-							TimeSpan((int64) * label.[Friend]mPointer));
+				int visiableLabelCnt = 0;
 
-						label.SetString(str);
-					}
-					label.mVisiable = true;
-				}
-				else
+				for (var graphLabel in graphDiscriptionsLabel)
 				{
-					label.mVisiable = false;
+					graphLabel.UpdateString(true);
+					if (graphLabel.GroupId >= (int)showLabels)
+					{
+						graphLabel.mPos.mY = (28 * (visiableLabelCnt++ + 1));
+						graphLabel.mVisiable = true;
+					}
+					else
+					{
+						graphLabel.mVisiable = false;
+					}
 				}
+				if ((int)showLabels < 3)
+					visiableLabelCnt++;
+				for (var i in ..<timerLabels.Count)
+				{
+					var timerLabel = timerLabels[i];
+					if (fc.mThreadEnabled[i])
+					{
+						if (timerLabel.UpdateString())
+						{
+							var threadAlive = fc.mRenderThreads[i].IsAlive;
+							/*if (threadAlive)
+								SafeMemberSet!(label.mColor, new Color(255, 32, 32));
+							else
+								SafeMemberSet!(label.mColor, new Color(64, 255, 64));*/
+
+							var str = new System.String();
+							str.AppendF("{}(R:{}) : {}", i + 1, threadAlive,
+								TimeSpan((int64) * timerLabel.[Friend]mPointer));
+
+							timerLabel.SetString(str);
+						}
+						timerLabel.mVisiable = true;
+						timerLabel.mPos.mY = (28 * (visiableLabelCnt++ + 1));
+					}
+					else
+					{
+						timerLabel.mVisiable = false;
+					}
+				}
+
+				statusLabel.UpdateString(fc.RenderingDone, true);
+				statusLabel.mPos.mY = (28 * (visiableLabelCnt++ + 1));
 			}
-			/*if (lastStatus != fc.RenderingDone)
-			{
-				lastStatus = fc.RenderingDone;
-				if (lastStatusString != null)
-					delete lastStatusString;
-				lastStatusString = DrawUtils.GetStringOutlineImage(gEngineApp.mRenderer, gEngineApp.mFont, 8, 4 + (28 * 0), StackStringFormat!("Rendering Done: {}", (bool)lastStatus), .(64, 255, 192, 255));
-			}*/
 		}
 
 		public override void MouseDown(SDL2.SDL.MouseButtonEvent evt)
@@ -295,43 +398,16 @@ namespace FractelOPOP
 		public override void HandleInput()
 		{
 			kbManager.HandleInput();
-			var delay = kbManager.KeyPressDelay;
-			//var delta = kbManager.getDelta();
-
-
-			/*kbManager.AddKey(.C, new (delta) =>
-				{
-					fc.[Friend]xyPixelStep = Math.Max(fc.[Friend]xyPixelStep - 1, 1);
-					Logger.Info("pixelstep", fc.[Friend]xyPixelStep);
-					return 20;
-				});*/
-
-
-			/*else if (gGameApp.IsKeyDown(.X))
-			{
-				//for (var fc in fc)
-				//{
-				fc.[Friend]xyPixelStep++;
-				Logger.Info("pixelstep", fc.[Friend]xyPixelStep);
-				//}
-				delay = 20;
-			}*/
-
-
-
 			var ret = kbManager.HandlePanAndZoom(gGameApp.mCam);
 
-			if (ret > delay)
-				delay = ret;
+			if (ret > kbManager.KeyPressDelay)
+				kbManager.KeyPressDelay = ret;
 
-
-			if (delay == 20)
+			if (liveUpdate && rerender)
 			{
-				if (mLiveUpdate)
-				{
-					fc.PreperRenderImages();
-				}
+				fc.PreperRenderImages();
 			}
+			rerender = false;
 		}
 	}
 }
