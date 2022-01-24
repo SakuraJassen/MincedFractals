@@ -38,6 +38,7 @@ namespace FractelOPOP
 			}
 			fc = new FractelChunkMultiThread(new .(gGameApp.mScreen.w, gGameApp.mScreen.h), -1.12, 1.12, -2.0, 0.47, 2, 200);
 			//fc = new FractelChunk(new .(gGameApp.mScreen.w * 2, gGameApp.mScreen.h * 2), -2, 2, -2, 2, 2, 400);
+
 			for (var i in ..<fc.mRenderThreads.Count)
 			{
 				//var label = new DataLabel<int64>(&fc.LastRenderingTimes[i + 1], 4, 4 + (28 * (i + 1)));
@@ -48,7 +49,7 @@ namespace FractelOPOP
 			timerLabels.Add(new DataLabel<int64>(&fc.LastRenderingTimes[3], 4, 4 + (28 * 2)));
 			timerLabels.Add(new DataLabel<int64>(&fc.LastRenderingTimes[5], 4, 4 + (28 * 3)));*/
 			statusLabel = new DataLabel<bool>(null, 4, 4 + (28 * (fc.mRenderThreads.Count + 1)));
-			statusLabel.[Friend]mformatString = "Rendering Done: {}";
+			//statusLabel.[Friend]mformatString = "Rendering Done: {}";
 
 			for (var label in timerLabels)
 			{
@@ -225,7 +226,7 @@ namespace FractelOPOP
 			{
 				label.Draw(dt);
 			}
-			statusLabel.Draw(dt);
+			//statusLabel.Draw(dt);
 			if (lastError != SDL.GetError())
 			{
 				lastError = SDL.GetError();

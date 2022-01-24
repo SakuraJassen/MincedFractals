@@ -28,8 +28,8 @@ namespace FractelOPOP.Entity
 
 		private ColourTable colourTable = null ~ SafeDelete!(_);// Colour table.
 
-		volatile private Image mCurrentImage ~ SafeDelete!(_);
-		volatile private List<Image> lImages = new List<Image>() ~ DeleteContainerAndItems!(_);
+		volatile private Image mCurrentImage = null;//~ SafeDelete!(_);
+		volatile private Image[] lImages = new Image[16]() ~ DeleteContainerAndItems!(_);
 		private Size2D mSize ~ SafeDelete!(_);
 
 		public List<Thread> mRenderThreads = new List<Thread>() ~ DeleteContainerAndItems!(_);
@@ -62,6 +62,18 @@ namespace FractelOPOP.Entity
 			xyPixelStep = pixelStep;
 			zoomScale = zoomS;
 
+
+			for (var i in ..<lImages.Count)
+			{
+				SafeDelete!(lImages[i]);
+				SDL2.Image image = new Image();
+				if (DrawUtils.CreateTexture(image, mSize, gEngineApp.mRenderer, .Streaming) case .Err(let err))
+				{
+					SDLError!(1);
+				}
+				lImages[i] = image;
+			}
+
 			mRenderThreads.Add(new Thread(new () => RenderImageOne()));
 			mRenderThreads.Add(new Thread(new () => RenderImageTwo()));
 			mRenderThreads.Add(new Thread(new () => RenderImageThree()));
@@ -92,12 +104,19 @@ namespace FractelOPOP.Entity
 		{
 			Vector2D projectedPos = gGameApp.mCam.GetProjected(scope Vector2D(0, mSize.Height / 1000));
 			defer delete projectedPos;
-
 			Image drawImage = Volatile.Read<Image>(ref mCurrentImage);
+			for (var i in ..<mRenderThreads.Count)
+			{
+				if (mRenderThreads[i].IsAlive == false)
+				{
+					mCurrentImage = Volatile.Read<Image>(ref lImages[i + 1]);
+					break;//Volatile.Read<Image>(ref mCurrentImage);
+				}
+			}
 
-			if (drawImage?.mTexture == null)
+			if (mCurrentImage?.mTexture == null)
 				return;
-			gEngineApp.Draw(drawImage, projectedPos.mX, projectedPos.mY, 0f, gGameApp.mCam.mSize);//mPos.mX, mPos.mY, mDrawAngle);
+			gEngineApp.Draw(mCurrentImage, projectedPos.mX, projectedPos.mY, 0f, gGameApp.mCam.mSize);//mPos.mX, mPos.mY, mDrawAngle);
 		}
 
 		bool deletingOldImages = false;
@@ -120,18 +139,20 @@ namespace FractelOPOP.Entity
 			}
 			deletingOldImages = true;
 			SDL.Delay(200);
-			var images = Volatile.Read<List<Image>>(ref lImages);
-			if (images.Count > 20)
-			{
-				Volatile.Write<List<Image>>(ref lImages, new List<Image>());
-				for (var i in ..<images.Count)
-				{
-					SafeDelete!(images[i]);
-				}
-				images.Clear();
+			//var images = Volatile.Read<Image[]>(ref lImages);
 
-				DeleteContainerAndItems!(images);
-			}
+			/*for (var i in ..<images.Count)
+			{
+				SafeDelete!(images[i]);
+				images[i] = null;
+				SDL2.Image image = new Image();
+				if (DrawUtils.CreateTexture(image, mSize, gEngineApp.mRenderer, .Streaming) case .Err(let err))
+				{
+					SDLError!(1);
+				}
+				images[i] = image;
+			}*/
+
 			deletingOldImages = false;
 
 			for (var i in ..<mRenderThreads.Count)
@@ -162,14 +183,15 @@ namespace FractelOPOP.Entity
 
 		public void RenderImageByPixel(int32 pixelStep)
 		{
-			var ret = GetRenderImage(yMin / zoomScale + yOffset, (yMax) / zoomScale + yOffset, (xMin) / zoomScale + xOffset, (xMax) / zoomScale + xOffset, (int32)(kMax + (zoomScale / 10)), pixelStep);
+			var images = Volatile.Read<Image>(ref lImages[pixelStep]);
+			var ret = GetRenderImage(images, yMin / zoomScale + yOffset, (yMax) / zoomScale + yOffset, (xMin) / zoomScale + xOffset, (xMax) / zoomScale + xOffset, (int32)(kMax + (zoomScale / 10)), pixelStep);
 			switch (ret)
 			{
 			case .Err(let err):
 				return;
 			case .Ok(let retImage):
 				int cnt = 0;
-				while (savingImage || deletingOldImages)
+				/*while (savingImage || deletingOldImages)
 				{
 					SDL.Delay(1);
 					if (++cnt > 300)
@@ -179,10 +201,10 @@ namespace FractelOPOP.Entity
 				}
 				savingImage = true;
 				var img = Volatile.Read<Image>(ref mCurrentImage);
-				var imgList = Volatile.Read<List<Image>>(ref lImages);
+				var imgList = Volatile.Read<Image[]>(ref lImages);
 				imgList.Add(img);
 				Volatile.Write<Image>(ref mCurrentImage, ret);
-				savingImage = false;
+				savingImage = false;*/
 			}
 		}
 
@@ -215,26 +237,26 @@ namespace FractelOPOP.Entity
 
 		public void RenderImage()
 		{
-			var ret = GetRenderImage(yMin / zoomScale + yOffset, (yMax) / zoomScale + yOffset, (xMin) / zoomScale + xOffset, (xMax) / zoomScale + xOffset, (int32)(kMax + zoomScale), xyPixelStep);
+			Debug.FatalError("Memory Leak!");
+			SDL2.Image image = new Image();
+			if (DrawUtils.CreateTexture(image, mSize, gEngineApp.mRenderer, .Streaming) case .Err(let err))
+			{
+				SDLError!(1);
+			}
+			var ret = GetRenderImage(image, yMin / zoomScale + yOffset, (yMax) / zoomScale + yOffset, (xMin) / zoomScale + xOffset, (xMax) / zoomScale + xOffset, (int32)(kMax + zoomScale), xyPixelStep);
 
 			Image img = Volatile.Read<Image>(ref mCurrentImage);
 			if (img != null)
 				delete img;
 			Volatile.Write<Image>(ref mCurrentImage, ret);
-			lImages.Add(ret);
+			Volatile.Write<Image>(ref lImages[0], ret);
+
 			//SafeMemberSet!(mImage, ret);
 		}
 
-		public Result<SDL2.Image> GetRenderImage(double yMin, double yMax, double xMin, double xMax, int32 kMax, int32 pixelStep)
+		public Result<SDL2.Image> GetRenderImage(Image image, double yMin, double yMax, double xMin, double xMax, int32 kMax, int32 pixelStep)
 		{
 			Volatile.Write<int64>(ref lastRenderingTime[pixelStep], 0);
-
-			SDL2.Image image = new Image();
-			if (DrawUtils.CreateTexture(image, mSize, gEngineApp.mRenderer, .Streaming) case .Err(let err))
-			{
-				SDLError!(1);
-				return .Err((void)"Thread terminated");
-			}
 
 			var err = SDL.LockTexture(image.mTexture, null, var data, var pitch);
 			if (err != 0)
@@ -244,6 +266,11 @@ namespace FractelOPOP.Entity
 				SDL.UnlockTexture(image.mTexture);
 				SDLError!(err);
 				return .Err((void)"Thread terminated");
+			}
+
+			for (int i in ..<(int)(mSize.Width * mSize.Height))
+			{
+				((uint32*)data)[i] = (uint32)0;
 			}
 
 
@@ -268,7 +295,6 @@ namespace FractelOPOP.Entity
 				{
 					logCurrentTime(-1, pixelStep);
 					SDL.UnlockTexture(image.mTexture);
-					delete image;
 					return .Err((void)"Thread terminated");
 				}
 
@@ -376,7 +402,7 @@ namespace FractelOPOP.Entity
 			logCurrentTime(sw.ElapsedMicroseconds, pixelStep);
 
 			SDL.UnlockTexture(image.mTexture);
-			return .Ok(image);
+			return .Ok(null);
 		}
 
 		void logCurrentTime(int64 renderingTime, int pixelStep)
