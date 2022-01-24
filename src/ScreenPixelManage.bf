@@ -1,3 +1,4 @@
+using BasicEngine;
 namespace FractelOPOP
 {
 	class ScreenPixelManage
@@ -12,7 +13,7 @@ namespace FractelOPOP
 		/// <summary>
 		/// Simple class used to define a pixel's coordinates.
 		/// </summary>
-		public class PixelCoord
+		public struct PixelCoord
 		{
 			public int xPixel;
 			public int yPixel;
@@ -49,9 +50,17 @@ namespace FractelOPOP
 		/// as an X,Y screen coordinate</returns>
 		public PixelCoord GetPixelCoord(ComplexPoint cmplxPoint)
 		{
-			PixelCoord result = new PixelCoord();
+			PixelCoord result = PixelCoord();
 			result.xPixel = (int)(convConstX1 * cmplxPoint.x - convConstX2);
 			result.yPixel = (int)(convConstY1 - convConstY2 * cmplxPoint.y);
+			return result;
+		}
+
+		public v2d<double> GetPixelCoord(v2d<double> cmplxPoint)
+		{
+			v2d<double> result = v2d<double>(0d, 0d);
+			result.x = (int)(convConstX1 * cmplxPoint.x - convConstX2);
+			result.y = (int)(convConstY1 - convConstY2 * cmplxPoint.y);
 			return result;
 		}
 
@@ -98,6 +107,14 @@ namespace FractelOPOP
 		public ComplexPoint GetAbsoluteMathsCoord(ComplexPoint pixelCoord)
 		{
 			ComplexPoint result = ComplexPoint(
+				(convConstX2 + pixelCoord.x) / convConstX1,
+				(convConstY1 - pixelCoord.y) / convConstY2);
+			return result;
+		}
+
+		public v2d<double> GetAbsoluteMathsCoord(v2d<double> pixelCoord)
+		{
+			v2d<double> result = v2d<double>(
 				(convConstX2 + pixelCoord.x) / convConstX1,
 				(convConstY1 - pixelCoord.y) / convConstY2);
 			return result;

@@ -73,18 +73,13 @@ namespace FractelOPOP.Entity
 				}
 				lImages[i] = image;
 			}
-
-			//mRenderThreads.Add(new Thread((ParameterizedThreadStart)new (pixelStep) => RenderImageByPixel((int32)pixelStep)));
-			mRenderThreads.Add(new Thread(new () => RenderImage1()));
-			mRenderThreads.Add(new Thread(new () => RenderImage2()));
-			mRenderThreads.Add(new Thread(new () => RenderImage3()));
-			mRenderThreads.Add(new Thread(new () => RenderImage4()));
-			mRenderThreads.Add(new Thread(new () => RenderImage5()));
-
-			mThreadEnabled = new bool[8];
+			mThreadEnabled = new bool[9];
 			mThreadEnabled[0] = true;
 			mThreadEnabled[1] = true;
 			mThreadEnabled[3] = true;
+
+			for (int32 i in ..<mThreadEnabled.Count)
+				mRenderThreads.Add(new Thread(new () => RenderImageByPixel(i + 1)));
 
 			SafeMemberSet!(colourTable, new ColourTable(10000 * 2, 10000 * 2));
 		}
@@ -101,6 +96,17 @@ namespace FractelOPOP.Entity
 			mSize = size;
 		}
 
+		public void SetMembers(double yMinimum, double yMaximum, double xMinimum, double xMaximum, int32 pixelStep = 1, double kMaximum = 200, int zoomS = 1)
+		{
+			yMin = yMinimum;
+			yMax = yMaximum;
+			xMin = xMinimum;
+			xMax = xMaximum;
+			kMax = kMaximum;
+			xyPixelStep = pixelStep;
+			zoomScale = zoomS;
+		}
+
 		public ~this()
 		{
 			for (var i in ..<mThreadEnabled.Count)
@@ -112,18 +118,12 @@ namespace FractelOPOP.Entity
 				SDL.Delay(10);// Wait for the threads to terminate before we free the resources.
 			}
 		}
+
 		public void Draw()
 		{
 			Vector2D projectedPos = gGameApp.mCam.GetProjected(scope Vector2D(0, mSize.Height / 1000));
 			defer delete projectedPos;
-			/*for (var i in ..<mRenderThreads.Count)
-			{
-				if (mThreadEnabled[i] && mRenderThreads[i].IsAlive == false)
-				{
-					//mCurrentImage = Volatile.Read<Image>(ref lImages[i + 1]);
-					break;//Volatile.Read<Image>(ref mCurrentImage);
-				}
-			}*/
+
 			//mCurrentImage should always be a ref to the last Image that got completely rendered.
 			if (mCurrentImage?.mTexture == null)
 				return;
@@ -147,8 +147,6 @@ namespace FractelOPOP.Entity
 			{
 				mThreadEnabled[i] = lbool[i];
 			}
-
-
 			for (var i in ..<mRenderThreads.Count)
 			{
 				if (mThreadEnabled[i])
@@ -175,58 +173,11 @@ namespace FractelOPOP.Entity
 			case .Ok(let retImage):
 				Volatile.Write<Image>(ref mCurrentImage, images);
 			}
-
+			logCurrentTime(LastRenderingTimes[pixelStep] + 1, pixelStep);
 			Logger.Debug(StackStringFormat!("{} : {}", pixelStep, TimeSpan(LastRenderingTimes[pixelStep])));
 		}
 
-		public void RenderImage1()
-		{
-			RenderImageByPixel(1);
-		}
 
-		public void RenderImage2()
-		{
-			RenderImageByPixel(2);
-		}
-
-		public void RenderImage3()
-		{
-			RenderImageByPixel(3);
-		}
-
-		public void RenderImage4()
-		{
-			RenderImageByPixel(4);
-		}
-
-		public void RenderImage5()
-		{
-			RenderImageByPixel(5);
-		}
-
-		public void RenderImage6()
-		{
-			RenderImageByPixel(6);
-		}
-
-		public void RenderImage()
-		{
-			Debug.FatalError("Memory Leak!");
-			SDL2.Image image = new Image();
-			if (DrawUtils.CreateTexture(image, mSize, gEngineApp.mRenderer, .Streaming) case .Err(let err))
-			{
-				SDLError!(1);
-			}
-			var ret = GetRenderImage(image, yMin / zoomScale + yOffset, (yMax) / zoomScale + yOffset, (xMin) / zoomScale + xOffset, (xMax) / zoomScale + xOffset, (int32)(kMax + zoomScale), xyPixelStep);
-
-			Image img = Volatile.Read<Image>(ref mCurrentImage);
-			if (img != null)
-				delete img;
-			Volatile.Write<Image>(ref mCurrentImage, ret);
-			Volatile.Write<Image>(ref lImages[0], ret);
-
-			//SafeMemberSet!(mImage, ret);
-		}
 
 		public Result<SDL2.Image> GetRenderImage(Image image, double yMin, double yMax, double xMin, double xMax, int32 kMax, int32 pixelStep)
 		{
@@ -252,12 +203,10 @@ namespace FractelOPOP.Entity
 			SDL2.SDL.Color color;
 			SDL2.SDL.Color colorLast = .();
 
-			ComplexPoint screenBottomLeft = ComplexPoint(xMin, yMin);
-			ComplexPoint screenTopRight = ComplexPoint(xMax, yMax);
 
-			var myPixelManager = scope ScreenPixelManage(gGameApp.mRenderer, screenBottomLeft, screenTopRight);
-
+			var myPixelManager = GetScreenPixelManager();
 			ComplexPoint xyStep = myPixelManager.GetDeltaMathsCoord(ComplexPoint(pixelStep, pixelStep));
+			SafeDeleteNullify!(myPixelManager);
 
 			Stopwatch sw = scope Stopwatch();
 			sw.Start();
@@ -403,6 +352,13 @@ namespace FractelOPOP.Entity
 					(data)[indexY + ix] = color8888;
 				}
 			}
+		}
+
+		public ScreenPixelManage GetScreenPixelManager()
+		{
+			ComplexPoint screenBottomLeft = ComplexPoint(xMin / zoomScale + yOffset, yMin / zoomScale + yOffset);
+			ComplexPoint screenTopRight = ComplexPoint(xMax / zoomScale + yOffset, yMax / zoomScale + yOffset);
+			return new ScreenPixelManage(gGameApp.mRenderer, screenBottomLeft, screenTopRight);
 		}
 
 		[Inline]

@@ -58,7 +58,7 @@ namespace FractelOPOP
 
 			kbManager.AddKey(.KpPlus, new (delta) =>
 				{
-					fc.[Friend]zoomScale *= 1.25f * delta;
+					fc.[Friend]zoomScale *= (1.25f * delta);
 					Logger.Info("zoom", fc.[Friend]zoomScale);
 					rerender = true;
 					return 20;
@@ -68,6 +68,23 @@ namespace FractelOPOP
 				{
 					fc.[Friend]yOffset -= (delta * 0.5) / fc.[Friend]zoomScale;
 					Logger.Info("y", fc.[Friend]yOffset);
+					rerender = true;
+					return 20;
+				});
+
+			kbManager.AddKey(.U, new (delta) =>
+				{
+					fc.[Friend]kMax *= (1.25f * delta);
+
+					Logger.Info("kMax", fc.[Friend]kMax);
+					rerender = true;
+					return 20;
+				});
+
+			kbManager.AddKey(.O, new (delta) =>
+				{
+					fc.[Friend]kMax = fc.[Friend]kMax / (1.25f * delta);
+					Logger.Info("kMax", fc.[Friend]kMax);
 					rerender = true;
 					return 20;
 				});
@@ -98,10 +115,10 @@ namespace FractelOPOP
 
 			kbManager.AddKey(.N, new (delta) =>
 				{
+					fc.SetMembers(-1.12, 1.12, -2.0, 0.47);
 					fc.[Friend]xOffset = 0;
 					fc.[Friend]yOffset = 0;
-					fc.[Friend]zoomScale = 1;
-					Logger.Info("reset", fc.[Friend]xOffset);
+					Logger.Info("reset");
 					rerender = true;
 					return 20;
 				});
@@ -221,7 +238,7 @@ namespace FractelOPOP
 			{
 				var label = new DataLabel<double>(&fc.[Friend]kMax, 4, 4 + (28 * (rowIndex++ + 1)));
 				label.[Friend]mformatString = "kMax: {0:00}";
-				label.GroupId = 1;
+				label.GroupId = 2;
 				label.ForceUpdateString();
 				graphDiscriptionsLabel.Add(label);
 			}
@@ -295,6 +312,21 @@ namespace FractelOPOP
 				label.Draw(dt);
 				//if (label.[Friend]mLastStringValue != fc.LastRenderingTimes[i])
 			}*/
+
+			if (holdingMouseDown)
+			{
+				SDL2.SDL.Rect* rect = scope .();
+				rect.x = (int32)zoomRec.mX;
+				rect.y = (int32)zoomRec.mY;
+				int32 mouseX = 0;
+				int32 mouseY = 0;
+				SDL.GetMouseState(&mouseX, &mouseY);
+				rect.w = mouseX - (int32)zoomRec.mX;
+				rect.h = mouseY - (int32)zoomRec.mY;
+				SDL.SetRenderDrawColor(gGameApp.mRenderer, 255, 255, 255, 255);
+				SDL.RenderDrawRect(gGameApp.mRenderer, rect);
+				SDL.SetRenderDrawColor(gGameApp.mRenderer, 0, 0, 0, 255);
+			}
 			if (showLabels > 0)
 			{
 				for (var label in timerLabels)
@@ -374,10 +406,16 @@ namespace FractelOPOP
 			}
 		}
 
+		Vector2D zoomRec = new Vector2D(0, 0) ~ SafeDelete!(_);
+		bool holdingMouseDown = false;
 		public override void MouseDown(SDL2.SDL.MouseButtonEvent evt)
 		{
 			base.MouseDown(evt);
-
+			if (!holdingMouseDown)
+			{
+				zoomRec.Set(evt.x, evt.y);
+				holdingMouseDown = true;
+			}
 			for (let entity in gEngineApp.mEntityList.mLayers[(int)LayeredList.LayerNames.HUD].mEntities)
 			{
 				if (let button = entity as BasicEngine.HUD.Button)
@@ -392,6 +430,28 @@ namespace FractelOPOP
 
 		public override void MouseUp(SDL2.SDL.MouseButtonEvent evt)
 		{
+			holdingMouseDown = false;
+			var myPixelManager = fc.GetScreenPixelManager();
+			defer { SafeDeleteNullify!(myPixelManager); }
+			var minPos = myPixelManager.GetAbsoluteMathsCoord(v2d<double>(zoomRec));
+			var maxPos = myPixelManager.GetAbsoluteMathsCoord(v2d<double>(evt.x, evt.y));
+			Logger.Debug(minPos.x, minPos.y);
+			Logger.Debug(maxPos.x, maxPos.y);
+			Logger.Debug(evt.x - zoomRec.mX, evt.y - zoomRec.mY);
+			const int ZOOM_THREASHOLD = 5;
+			if (evt.x - zoomRec.mX > ZOOM_THREASHOLD && evt.y - zoomRec.mY > ZOOM_THREASHOLD)
+			{
+				if (kbManager.KeyDown(.LShift))
+				{
+					fc.SetMembers(fc.[Friend]yMax * 2, fc.[Friend]yMin * 2, fc.[Friend]xMin * 2, fc.[Friend]xMax * 2, 1, fc.[Friend]kMax);
+				} else
+				{
+					fc.SetMembers(maxPos.y, minPos.y, minPos.x, maxPos.x, 1, fc.[Friend]kMax);
+				}
+				fc.[Friend]xOffset = 0;
+				fc.[Friend]yOffset = 0;
+				fc.PreperRenderImages();
+			}
 			base.MouseUp(evt);
 		}
 

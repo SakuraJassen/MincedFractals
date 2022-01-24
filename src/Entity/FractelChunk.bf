@@ -123,6 +123,25 @@ namespace FractelOPOP.Entity
 			//SafeMemberSet!(mImage, ret);
 		}
 
+		/*public void RenderImageSingleThread()
+		{
+			Debug.FatalError("Memory Leak!");
+			SDL2.Image image = new Image();
+			if (DrawUtils.CreateTexture(image, mSize, gEngineApp.mRenderer, .Streaming) case .Err(let err))
+			{
+				SDLError!(1);
+			}
+			var ret = GetRenderImage(image, yMin / zoomScale + yOffset, (yMax) / zoomScale + yOffset, (xMin) / zoomScale + xOffset, (xMax) / zoomScale + xOffset, (int32)(kMax + zoomScale), xyPixelStep);
+
+			Image img = Volatile.Read<Image>(ref mCurrentImage);
+			if (img != null)
+				delete img;
+			Volatile.Write<Image>(ref mCurrentImage, ret);
+			Volatile.Write<Image>(ref lImages[0], ret);
+
+			//SafeMemberSet!(mImage, ret);
+		}*/
+
 		public SDL2.Image GetRenderImage(double yMin, double yMax, double xMin, double xMax, int32 kMax, int32 xyPixelStep)
 		{
 			numColours = kMax;
