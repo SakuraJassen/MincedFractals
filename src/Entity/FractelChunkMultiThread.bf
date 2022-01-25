@@ -6,6 +6,7 @@ using System;
 using System.Collections;
 using System.Threading;
 using System.Threading.Tasks;
+using FractelOPOP.Entity.FractelOPOP.Entity.FractelChunk;
 
 namespace FractelOPOP.Entity
 {
@@ -15,16 +16,8 @@ namespace FractelOPOP.Entity
 
 		private uint32 mDrawCycle = 0;
 
-		private double yMin = -2.0;// Default minimum Y for the set to render.
-		private double yMax = 0.0;// Default maximum Y for the set to render.
-		public double yOffset = 0.0;// Default maximum Y for the set to render.
-		private double xMin = -2.0;// Default minimum X for the set to render.
-		private double xMax = 1.0;// Default maximum X for the set to render.
-		public double xOffset = 0;// Default maximum X for the set to render.
-		private double kMax = 50;
-		private int32 xyPixelStep = 4;
-		private int32 numColours = 85;// Default number of colours to use in colour table.
-		private double zoomScale = 1;// Default amount to zoom in by.
+		GraphParameters currentGraphParameters = .();
+		List<GraphParameters> undoHistory = new List<GraphParameters>() ~ SafeDelete!(_);
 
 		private ColourTable colourTable = null ~ SafeDelete!(_);// Colour table.
 
@@ -51,16 +44,15 @@ namespace FractelOPOP.Entity
 			}
 		}
 
-		public this(Size2D size, double yMinimum, double yMaximum, double xMinimum, double xMaximum, int32 pixelStep = 1, int32 kMaximum = 200, int zoomS = 1)
+		public this(Size2D size, double yMinimum, double yMaximum, double xMinimum, double xMaximum, int32 kMaximum = 200, int zoomS = 1)
 		{
 			mSize = size;
-			yMin = yMinimum;
-			yMax = yMaximum;
-			xMin = xMinimum;
-			xMax = xMaximum;
-			kMax = kMaximum;
-			xyPixelStep = pixelStep;
-			zoomScale = zoomS;
+			currentGraphParameters.yMin = yMinimum;
+			currentGraphParameters.yMax = yMaximum;
+			currentGraphParameters.xMin = xMinimum;
+			currentGraphParameters.xMax = xMaximum;
+			currentGraphParameters.kMax = kMaximum;
+			currentGraphParameters.zoomScale = zoomS;
 
 
 			for (var i in ..<lImages.Count)
@@ -81,30 +73,29 @@ namespace FractelOPOP.Entity
 			for (int32 i in ..<mThreadEnabled.Count)
 				mRenderThreads.Add(new Thread(new () => RenderImageByPixel(i + 1)));
 
-			SafeMemberSet!(colourTable, new ColourTable(10000 * 2, 10000 * 2));
+			SafeMemberSet!(colourTable, new ColourTable(400));
 		}
 
-		public this(Vector2D chunkPos, Size2D size, int pixelStep = 1, int zoomS = 1)
+		public this(Vector2D chunkPos, Size2D size, int zoomS = 1)
 		{
 			mChunkPos = chunkPos;
-			yMin = chunkPos.mY;
-			yMax = (chunkPos.mY + pixelStep);
-			xMin = chunkPos.mX;
-			xMax = (chunkPos.mX + pixelStep);
-			zoomScale = zoomS;
-			xyPixelStep = (int32)pixelStep;
+			currentGraphParameters.yMin = chunkPos.mY;
+			currentGraphParameters.yMax = (chunkPos.mY);
+			currentGraphParameters.xMin = chunkPos.mX;
+			currentGraphParameters.xMax = (chunkPos.mX);
+			currentGraphParameters.zoomScale = zoomS;
 			mSize = size;
 		}
 
-		public void SetMembers(double yMinimum, double yMaximum, double xMinimum, double xMaximum, int32 pixelStep = 1, double kMaximum = 200, int zoomS = 1)
+		public void SetMembers(double yMinimum, double yMaximum, double xMinimum, double xMaximum, double kMaximum = 700, int zoomS = 1)
 		{
-			yMin = yMinimum;
-			yMax = yMaximum;
-			xMin = xMinimum;
-			xMax = xMaximum;
-			kMax = kMaximum;
-			xyPixelStep = pixelStep;
-			zoomScale = zoomS;
+			undoHistory.Add(currentGraphParameters);
+			currentGraphParameters.yMin = yMinimum;
+			currentGraphParameters.yMax = yMaximum;
+			currentGraphParameters.xMin = xMinimum;
+			currentGraphParameters.xMax = xMaximum;
+			currentGraphParameters.kMax = kMaximum;
+			currentGraphParameters.zoomScale = zoomS;
 		}
 
 		public ~this()
@@ -139,9 +130,12 @@ namespace FractelOPOP.Entity
 				lbool.Add(mThreadEnabled[i]);
 				mThreadEnabled[i] = false;
 			}
+			var cnt = 0;
 			while (!RenderingDone)
 			{
 				SDL.Delay(10);
+				if (++cnt > 1000)
+					break;
 			}
 			for (var i in ..<lbool.Count)
 			{
@@ -165,7 +159,11 @@ namespace FractelOPOP.Entity
 		public void RenderImageByPixel(int32 pixelStep)
 		{
 			var images = Volatile.Read<Image>(ref lImages[pixelStep]);
-			var ret = GetRenderImage(images, yMin / zoomScale + yOffset, (yMax) / zoomScale + yOffset, (xMin) / zoomScale + xOffset, (xMax) / zoomScale + xOffset, (int32)(kMax + (zoomScale / 10)), pixelStep);
+			var ret = GetRenderImage(images, currentGraphParameters.yMin / currentGraphParameters.zoomScale + currentGraphParameters.yOffset,
+				(currentGraphParameters.yMax) / currentGraphParameters.zoomScale + currentGraphParameters.yOffset,
+				(currentGraphParameters.xMin) / currentGraphParameters.zoomScale + currentGraphParameters.xOffset,
+				(currentGraphParameters.xMax) / currentGraphParameters.zoomScale + currentGraphParameters.xOffset,
+				(int32)(currentGraphParameters.kMax + (currentGraphParameters.zoomScale / 10)), pixelStep);
 			switch (ret)
 			{
 			case .Err(let err):
@@ -206,6 +204,9 @@ namespace FractelOPOP.Entity
 
 			var myPixelManager = GetScreenPixelManager();
 			ComplexPoint xyStep = myPixelManager.GetDeltaMathsCoord(ComplexPoint(pixelStep, pixelStep));
+			double min = 1d / Math.Pow((double)10, (double)15);
+			xyStep.x = Math.Max(xyStep.x, min);
+			xyStep.y = Math.Max(xyStep.y, min);
 			SafeDeleteNullify!(myPixelManager);
 
 			Stopwatch sw = scope Stopwatch();
@@ -260,7 +261,7 @@ namespace FractelOPOP.Entity
 
 							color = ColourTable.ColorFromHSLA(hue, 0.9, 0.6);
 #else
-							color = colourTable.GetColour(k * 4);
+							color = colourTable.GetColour(k + k / 2);
 							colorLast = color;
 							kLast = k;
 #endif
@@ -336,6 +337,16 @@ namespace FractelOPOP.Entity
 			return Volatile.Read<int64>(ref lastRenderingTime[pixelStep]);
 		}
 
+		public void Undo()
+		{
+			if (undoHistory.Count > 0)
+			{
+				var oldkMax = currentGraphParameters.kMax;
+				currentGraphParameters = undoHistory.PopBack();
+				currentGraphParameters.kMax = oldkMax;
+			}
+		}
+
 		void SetPixels(uint32* data, Image image, int x, int y, int w, int h, SDL.Color color)
 		{
 			SDL.PixelFormat* fmt = image.mSurface.format;
@@ -343,11 +354,11 @@ namespace FractelOPOP.Entity
 			for (int iy = y; iy > y - w; iy--)
 			{
 				var indexY = (image.mSurface.w) * iy;
-				if (indexY < 0)
+				if (indexY < 0 || iy >= image.mSurface.h)
 					continue;
 				for (int ix = x; ix < x + w; ix++)
 				{
-					if (ix < 0)
+					if (ix < 0 || ix >= image.mSurface.w)
 						continue;
 					(data)[indexY + ix] = color8888;
 				}
@@ -356,8 +367,10 @@ namespace FractelOPOP.Entity
 
 		public ScreenPixelManage GetScreenPixelManager()
 		{
-			ComplexPoint screenBottomLeft = ComplexPoint(xMin / zoomScale + yOffset, yMin / zoomScale + yOffset);
-			ComplexPoint screenTopRight = ComplexPoint(xMax / zoomScale + yOffset, yMax / zoomScale + yOffset);
+			ComplexPoint screenBottomLeft = ComplexPoint(currentGraphParameters.xMin / currentGraphParameters.zoomScale + currentGraphParameters.xOffset,
+				currentGraphParameters.yMin / currentGraphParameters.zoomScale + currentGraphParameters.yOffset);
+			ComplexPoint screenTopRight = ComplexPoint(currentGraphParameters.xMax / currentGraphParameters.zoomScale + currentGraphParameters.xOffset,
+				currentGraphParameters.yMax / currentGraphParameters.zoomScale + currentGraphParameters.yOffset);
 			return new ScreenPixelManage(gGameApp.mRenderer, screenBottomLeft, screenTopRight);
 		}
 
@@ -402,6 +415,25 @@ namespace FractelOPOP.Entity
 			uint8 alpha = (uint8)temp;
 
 			return .(red, green, blue, alpha);
+		}
+	}
+
+	namespace FractelOPOP.Entity.FractelChunk
+	{
+		struct Depth
+		{
+		}
+
+		public struct GraphParameters
+		{
+			public double yMin = -2.0;// Default minimum Y for the set to render.
+			public double yMax = 0.0;// Default maximum Y for the set to render.
+			public double yOffset = 0.0;// Default maximum Y for the set to render.
+			public double xMin = -2.0;// Default minimum X for the set to render.
+			public double xMax = 1.0;// Default maximum X for the set to render.
+			public double xOffset = 0;// Default maximum X for the set to render.
+			public double kMax = 50;
+			public double zoomScale = 1;// Default amount to zoom in by.
 		}
 	}
 }

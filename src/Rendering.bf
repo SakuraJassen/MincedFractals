@@ -12,6 +12,7 @@ using FractelOPOP.Entity;
 using SDL2;
 using System.Threading;
 using BasicEngine.HUD;
+using System.IO;
 namespace FractelOPOP
 {
 	class Rendering : GameState
@@ -20,7 +21,7 @@ namespace FractelOPOP
 		private FractelChunkMultiThread fc = null ~ SafeDelete!(_);
 		private KeyboardManager kbManager = new KeyboardManager() ~ SafeDelete!(_);
 		//private FractelChunk fc = null ~ SafeDelete!(_);
-		bool liveUpdate = false;
+		bool liveUpdate = true;
 
 		overlayType showLabels = .reduce;
 		enum overlayType : int
@@ -42,7 +43,7 @@ namespace FractelOPOP
 
 		public this()
 		{
-			fc = new FractelChunkMultiThread(new .(gGameApp.mScreen.w, gGameApp.mScreen.h), -1.12, 1.12, -2.0, 0.47, 2, 200);
+			fc = new FractelChunkMultiThread(new .(gGameApp.mScreen.w, gGameApp.mScreen.h), -1.12, 1.12, -2.0, 0.47, 700);
 
 			setUpHud();
 
@@ -50,65 +51,68 @@ namespace FractelOPOP
 
 			kbManager.AddKey(.KpMinus, new (delta) =>
 				{
-					fc.[Friend]zoomScale = fc.[Friend]zoomScale / (1.25f * delta);
-					Logger.Info("zoom", fc.[Friend]zoomScale);
+					fc.[Friend]currentGraphParameters.zoomScale = fc.[Friend]currentGraphParameters.zoomScale / (1.25f * delta);
+					Logger.Info("zoom", fc.[Friend]currentGraphParameters.zoomScale);
 					rerender = true;
 					return 20;
 				});
 
 			kbManager.AddKey(.KpPlus, new (delta) =>
 				{
-					fc.[Friend]zoomScale *= (1.25f * delta);
-					Logger.Info("zoom", fc.[Friend]zoomScale);
+					fc.[Friend]currentGraphParameters.zoomScale *= (1.25f * delta);
+					Logger.Info("zoom", fc.[Friend]currentGraphParameters.zoomScale);
 					rerender = true;
 					return 20;
 				});
 
-			kbManager.AddKey(.K, new (delta) =>
-				{
-					fc.[Friend]yOffset -= (delta * 0.5) / fc.[Friend]zoomScale;
-					Logger.Info("y", fc.[Friend]yOffset);
-					rerender = true;
-					return 20;
-				});
 
 			kbManager.AddKey(.U, new (delta) =>
 				{
-					fc.[Friend]kMax *= (1.25f * delta);
+					fc.[Friend]currentGraphParameters.kMax += (10f * delta);
 
-					Logger.Info("kMax", fc.[Friend]kMax);
+					Logger.Info("kMax", fc.[Friend]currentGraphParameters.kMax);
 					rerender = true;
 					return 20;
 				});
 
 			kbManager.AddKey(.O, new (delta) =>
 				{
-					fc.[Friend]kMax = fc.[Friend]kMax / (1.25f * delta);
-					Logger.Info("kMax", fc.[Friend]kMax);
+					fc.[Friend]currentGraphParameters.kMax -= (10f * delta);
+					if (fc.[Friend]currentGraphParameters.kMax < 1)
+						fc.[Friend]currentGraphParameters.kMax = 1;
+					Logger.Info("kMax", fc.[Friend]currentGraphParameters.kMax);
+					rerender = true;
+					return 20;
+				});
+
+			kbManager.AddKey(.K, new (delta) =>
+				{
+					fc.[Friend]currentGraphParameters.yOffset += ((fc.[Friend]currentGraphParameters.yMin - fc.[Friend]currentGraphParameters.yMax) * 0.1 * delta) / fc.[Friend]currentGraphParameters.zoomScale;
+					Logger.Info("y", fc.[Friend]currentGraphParameters.yOffset);
 					rerender = true;
 					return 20;
 				});
 
 			kbManager.AddKey(.I, new (delta) =>
 				{
-					fc.[Friend]yOffset += (delta * 0.5) / fc.[Friend]zoomScale;
-					Logger.Info("y", fc.[Friend]yOffset);
+					fc.[Friend]currentGraphParameters.yOffset -= ((fc.[Friend]currentGraphParameters.yMin - fc.[Friend]currentGraphParameters.yMax) * 0.1 * delta) / fc.[Friend]currentGraphParameters.zoomScale;
+					Logger.Info("y", fc.[Friend]currentGraphParameters.yOffset);
 					rerender = true;
 					return 20;
 				});
 
 			kbManager.AddKey(.J, new (delta) =>
 				{
-					fc.[Friend]xOffset -= (delta * 0.5) / fc.[Friend]zoomScale;
-					Logger.Info("x", fc.[Friend]xOffset);
+					fc.[Friend]currentGraphParameters.xOffset += ((fc.[Friend]currentGraphParameters.yMin - fc.[Friend]currentGraphParameters.yMax) * 0.1 * delta) / fc.[Friend]currentGraphParameters.zoomScale;
+					Logger.Info("x", fc.[Friend]currentGraphParameters.xOffset);
 					rerender = true;
 					return 20;
 				});
 
 			kbManager.AddKey(.L, new (delta) =>
 				{
-					fc.[Friend]xOffset += (delta * 0.5) / fc.[Friend]zoomScale;
-					Logger.Info("x", fc.[Friend]xOffset);
+					fc.[Friend]currentGraphParameters.xOffset -= ((fc.[Friend]currentGraphParameters.xMin - fc.[Friend]currentGraphParameters.xMax) * 0.1 * delta) / fc.[Friend]currentGraphParameters.zoomScale;
+					Logger.Info("x", fc.[Friend]currentGraphParameters.xOffset);
 					rerender = true;
 					return 20;
 				});
@@ -116,8 +120,8 @@ namespace FractelOPOP
 			kbManager.AddKey(.N, new (delta) =>
 				{
 					fc.SetMembers(-1.12, 1.12, -2.0, 0.47);
-					fc.[Friend]xOffset = 0;
-					fc.[Friend]yOffset = 0;
+					fc.[Friend]currentGraphParameters.xOffset = 0;
+					fc.[Friend]currentGraphParameters.yOffset = 0;
 					Logger.Info("reset");
 					rerender = true;
 					return 20;
@@ -126,6 +130,50 @@ namespace FractelOPOP
 			kbManager.AddKey(.R, new (delta) =>
 				{
 					fc.PreperRenderImages();
+					return 20;
+				});
+
+			kbManager.AddKey(.Z, new (delta) =>
+				{
+					fc.Undo();
+					rerender = true;
+					return 20;
+				});
+
+			kbManager.AddKey(.F10, new (delta) =>
+				{
+					var basename = scope String();
+					basename.AppendF(".\\png\\{}{}{}-{}{}{}", DateTime.Now.Day, DateTime.Now.Month, DateTime.Now.Year, DateTime.Now.Hour, DateTime.Now.Minute, DateTime.Now.Second);
+					SDLError!(fc.[Friend]mCurrentImage.SaveTexture(StackStringFormat!("{}.png", basename), gGameApp.mRenderer));
+
+					StreamWriter sw = scope .();
+					sw.Create(StackStringFormat!("{}.txt", basename));
+					sw.WriteLine(ToStackString!(fc.[Friend]currentGraphParameters.yMin));
+					sw.WriteLine(ToStackString!(fc.[Friend]currentGraphParameters.yMax));
+					sw.WriteLine(ToStackString!(fc.[Friend]currentGraphParameters.xMin));
+					sw.WriteLine(ToStackString!(fc.[Friend]currentGraphParameters.xMax));
+					sw.WriteLine(ToStackString!(fc.[Friend]currentGraphParameters.kMax));
+					sw.WriteLine(ToStackString!(fc.[Friend]currentGraphParameters.zoomScale));
+					return 20;
+				});
+
+			kbManager.AddKey(.KpDivide, new (delta) =>
+				{
+					fc.[Friend]colourTable.Smooth();
+					rerender = true;
+					return 20;
+				});
+
+			kbManager.AddKey(.KpMultiply, new (delta) =>
+				{
+					SafeMemberSet!(fc.[Friend]colourTable, new ColourTable(400));
+					rerender = true;
+					return 20;
+				});
+			kbManager.AddKey(.Y, new (delta) =>
+				{
+					fc.Undo();
+					rerender = true;
 					return 20;
 				});
 			kbManager.AddKey(.B, new (delta) =>
@@ -208,56 +256,56 @@ namespace FractelOPOP
 		{
 			int rowIndex = 0;
 			{
-				var label = new DataLabel<double>(&fc.[Friend]yMin, 4, 4 + (28 * (rowIndex++ + 1)));
+				var label = new DataLabel<double>(&fc.[Friend]currentGraphParameters.yMin, 4, 4 + (28 * (rowIndex++ + 1)));
 				label.[Friend]mformatString = "yMin: {0:00}";
 				label.ForceUpdateString();
 				label.GroupId = 1;
 				graphDiscriptionsLabel.Add(label);
 			}
 			{
-				var label = new DataLabel<double>(&fc.[Friend]yMax, 4, 4 + (28 * (rowIndex++ + 1)));
+				var label = new DataLabel<double>(&fc.[Friend]currentGraphParameters.yMax, 4, 4 + (28 * (rowIndex++ + 1)));
 				label.[Friend]mformatString = "yMax: {0:0}";
 				label.ForceUpdateString();
 				label.GroupId = 1;
 				graphDiscriptionsLabel.Add(label);
 			}
 			{
-				var label = new DataLabel<double>(&fc.[Friend]xMin, 4, 4 + (28 * (rowIndex++ + 1)));
+				var label = new DataLabel<double>(&fc.[Friend]currentGraphParameters.xMin, 4, 4 + (28 * (rowIndex++ + 1)));
 				label.[Friend]mformatString = "xMin: {0:0}";
 				label.ForceUpdateString();
 				label.GroupId = 1;
 				graphDiscriptionsLabel.Add(label);
 			}
 			{
-				var label = new DataLabel<double>(&fc.[Friend]xMax, 4, 4 + (28 * (rowIndex++ + 1)));
+				var label = new DataLabel<double>(&fc.[Friend]currentGraphParameters.xMax, 4, 4 + (28 * (rowIndex++ + 1)));
 				label.[Friend]mformatString = "xMax: {0:0}";
 				label.GroupId = 1;
 				label.ForceUpdateString();
 				graphDiscriptionsLabel.Add(label);
 			}
 			{
-				var label = new DataLabel<double>(&fc.[Friend]kMax, 4, 4 + (28 * (rowIndex++ + 1)));
+				var label = new DataLabel<double>(&fc.[Friend]currentGraphParameters.kMax, 4, 4 + (28 * (rowIndex++ + 1)));
 				label.[Friend]mformatString = "kMax: {0:00}";
 				label.GroupId = 2;
 				label.ForceUpdateString();
 				graphDiscriptionsLabel.Add(label);
 			}
 			{
-				var label = new DataLabel<double>(&fc.[Friend]yOffset, 4, 4 + (28 * (rowIndex++ + 1)));
+				var label = new DataLabel<double>(&fc.[Friend]currentGraphParameters.yOffset, 4, 4 + (28 * (rowIndex++ + 1)));
 				label.[Friend]mformatString = "yOffset: {}";
 				label.GroupId = 2;
 				label.ForceUpdateString();
 				graphDiscriptionsLabel.Add(label);
 			}
 			{
-				var label = new DataLabel<double>(&fc.[Friend]xOffset, 4, 4 + (28 * (rowIndex++ + 1)));
+				var label = new DataLabel<double>(&fc.[Friend]currentGraphParameters.xOffset, 4, 4 + (28 * (rowIndex++ + 1)));
 				label.[Friend]mformatString = "xOffset: {}";
 				label.GroupId = 2;
 				label.ForceUpdateString();
 				graphDiscriptionsLabel.Add(label);
 			}
 			{
-				var label = new DataLabel<double>(&fc.[Friend]zoomScale, 4, 4 + (28 * (rowIndex++ + 1)));
+				var label = new DataLabel<double>(&fc.[Friend]currentGraphParameters.zoomScale, 4, 4 + (28 * (rowIndex++ + 1)));
 				label.[Friend]mformatString = "zoomScale: {}";
 				label.GroupId = 2;
 				label.ForceUpdateString();
@@ -315,14 +363,29 @@ namespace FractelOPOP
 
 			if (holdingMouseDown)
 			{
+				var myPixelManager = fc.GetScreenPixelManager();
+				defer { SafeDeleteNullify!(myPixelManager); }
 				SDL2.SDL.Rect* rect = scope .();
 				rect.x = (int32)zoomRec.mX;
 				rect.y = (int32)zoomRec.mY;
 				int32 mouseX = 0;
 				int32 mouseY = 0;
 				SDL.GetMouseState(&mouseX, &mouseY);
-				rect.w = mouseX - (int32)zoomRec.mX;
-				rect.h = mouseY - (int32)zoomRec.mY;
+				//var maxPos = myPixelManager.GetAbsoluteMathsCoord(v2d<double>(mouseX, mouseY));
+
+				if (kbManager.KeyDown(.LCtrl))
+				{
+					/*var scalingY = Math.Abs(fc.[Friend]currentGraphParameters.yMax / fc.[Friend]currentGraphParameters.yMin);
+					var scalingX = Math.Abs(fc.[Friend]currentGraphParameters.xMax / fc.[Friend]currentGraphParameters.xMin);*/
+					rect.w = (mouseX - (int32)zoomRec.mX) * 2;
+					rect.h = (mouseY - (int32)zoomRec.mY) * 2;
+					rect.y -= rect.h / 2;
+					rect.x -= rect.w / 2;
+				} else
+				{
+					rect.w = mouseX - (int32)zoomRec.mX;
+					rect.h = mouseY - (int32)zoomRec.mY;
+				}
 				SDL.SetRenderDrawColor(gGameApp.mRenderer, 255, 255, 255, 255);
 				SDL.RenderDrawRect(gGameApp.mRenderer, rect);
 				SDL.SetRenderDrawColor(gGameApp.mRenderer, 0, 0, 0, 255);
@@ -431,27 +494,58 @@ namespace FractelOPOP
 		public override void MouseUp(SDL2.SDL.MouseButtonEvent evt)
 		{
 			holdingMouseDown = false;
+
+			const int ZOOM_THREASHOLD = 5;
+			Size2D RecSize = scope .(evt.x - zoomRec.mX, evt.y - zoomRec.mY);
+
 			var myPixelManager = fc.GetScreenPixelManager();
 			defer { SafeDeleteNullify!(myPixelManager); }
-			var minPos = myPixelManager.GetAbsoluteMathsCoord(v2d<double>(zoomRec));
-			var maxPos = myPixelManager.GetAbsoluteMathsCoord(v2d<double>(evt.x, evt.y));
+
+			var bufferZoomRec = v2d<double>(zoomRec);
+			var bufferZoomRec2 = v2d<double>(evt.x, evt.y);
+
+			if (RecSize.Width < -ZOOM_THREASHOLD)
+			{
+				Swap!(bufferZoomRec.x, bufferZoomRec2.x);
+			}
+			if (RecSize.Height < -ZOOM_THREASHOLD)
+			{
+				Swap!(bufferZoomRec.y, bufferZoomRec2.y);
+			}
+			var minPos = myPixelManager.GetAbsoluteMathsCoord(bufferZoomRec);
+			var maxPos = myPixelManager.GetAbsoluteMathsCoord(bufferZoomRec2);
+
+			if (kbManager.KeyDown(.LCtrl))
+			{
+				/*var scalingY = fc.[Friend]currentGraphParameters.yMax / yMax;
+				var scalingX = fc.[Friend]currentGraphParameters.xMax / maxPos.x;
+
+				maxPos.y = maxPos.y / scalingY;
+				maxPos.x = maxPos.y / scalingX;*/
+
+				var width = (maxPos.x - minPos.x) * 2;
+				var height = (maxPos.y - minPos.y) * 2;
+				minPos.x -= width / 2;
+				minPos.y -= height / 2;
+			}
+
 			Logger.Debug(minPos.x, minPos.y);
 			Logger.Debug(maxPos.x, maxPos.y);
-			Logger.Debug(evt.x - zoomRec.mX, evt.y - zoomRec.mY);
-			const int ZOOM_THREASHOLD = 5;
-			if (evt.x - zoomRec.mX > ZOOM_THREASHOLD && evt.y - zoomRec.mY > ZOOM_THREASHOLD)
+			Logger.Debug(evt.x - bufferZoomRec.y, evt.y - bufferZoomRec.y);
+
+			if (kbManager.KeyDown(.LShift) || evt.button == 3)//Rightclick
 			{
-				if (kbManager.KeyDown(.LShift))
-				{
-					fc.SetMembers(fc.[Friend]yMax * 2, fc.[Friend]yMin * 2, fc.[Friend]xMin * 2, fc.[Friend]xMax * 2, 1, fc.[Friend]kMax);
-				} else
-				{
-					fc.SetMembers(maxPos.y, minPos.y, minPos.x, maxPos.x, 1, fc.[Friend]kMax);
-				}
-				fc.[Friend]xOffset = 0;
-				fc.[Friend]yOffset = 0;
+				fc.Undo();
+				fc.PreperRenderImages();
+			} else if ((RecSize.Width > ZOOM_THREASHOLD || RecSize.Width < -ZOOM_THREASHOLD) && (RecSize.Height < -ZOOM_THREASHOLD || RecSize.Height > ZOOM_THREASHOLD))
+			{
+				fc.SetMembers(maxPos.y, minPos.y, minPos.x, maxPos.x, fc.[Friend]currentGraphParameters.kMax);
+				fc.[Friend]currentGraphParameters.xOffset = 0;
+				fc.[Friend]currentGraphParameters.yOffset = 0;
 				fc.PreperRenderImages();
 			}
+
+
 			base.MouseUp(evt);
 		}
 
