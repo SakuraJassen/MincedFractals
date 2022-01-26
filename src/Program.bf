@@ -4,7 +4,7 @@ using BasicEngine.Debug;
 using System.Collections;
 using System;
 
-namespace FractelOPOP
+namespace MincedFractals
 {
 	class Program
 	{

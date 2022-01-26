@@ -8,12 +8,12 @@ using BasicEngine.Debug;
 using BasicEngine.Collections;
 using BasicEngine.Rendering;
 using BasicEngine.Entity;
-using FractelOPOP.Entity;
+using MincedFractals.Entity;
 using SDL2;
 using System.Threading;
 using BasicEngine.HUD;
 using System.IO;
-namespace FractelOPOP
+namespace MincedFractals
 {
 	class Rendering : GameState
 	{
@@ -38,6 +38,7 @@ namespace FractelOPOP
 		List<DataLabel<int64>> timerLabels = new List<DataLabel<int64>>() ~ DeleteContainerAndItems!(_);
 		List<DataLabel<double>> graphDiscriptionsLabel = new List<DataLabel<double>>() ~ DeleteContainerAndItems!(_);
 		DataLabel<bool> statusLabel = null ~ DeleteAndNullify!(_);
+		DataLabel<int64> animationLabel = null ~ DeleteAndNullify!(_);
 		bool lastStatus = false;
 		Image lastStatusString = null ~ SafeDelete!(_);
 
@@ -75,6 +76,23 @@ namespace FractelOPOP
 					return 20;
 				});
 
+
+			kbManager.AddKey(.Period, new (delta) =>
+				{
+					fc.mAnimationThread.CopyAnimation(fc.[Friend]undoHistory);
+					fc.mAnimationThread.StartAnimation(fc);
+					Logger.Info("Start Animation");
+
+					return 20;
+				});
+
+			kbManager.AddKey(.Comma, new (delta) =>
+				{
+					fc.mAnimationThread.StopAnimation();
+					Logger.Info("Stop Animation");
+
+					return 20;
+				});
 			kbManager.AddKey(.O, new (delta) =>
 				{
 					fc.[Friend]currentGraphParameters.kMax -= (10f * delta);
@@ -119,7 +137,7 @@ namespace FractelOPOP
 
 			kbManager.AddKey(.N, new (delta) =>
 				{
-					fc.SetMembers(-1.12, 1.12, -2.0, 0.47);
+					fc.SetGraphParameters(-1.12, 1.12, -2.0, 0.47);
 					fc.[Friend]currentGraphParameters.xOffset = 0;
 					fc.[Friend]currentGraphParameters.yOffset = 0;
 					Logger.Info("reset");
@@ -202,48 +220,48 @@ namespace FractelOPOP
 
 			kbManager.AddKey(.Kp1, new (delta) =>
 				{
-					fc.mThreadEnabled[0] = !fc.mThreadEnabled[0];
+					fc.mRenderThreads[0].Enabled = !fc.mRenderThreads[0].Enabled;
 					return 21;
 				});
 
 			kbManager.AddKey(.Kp2, new (delta) =>
 				{
-					fc.mThreadEnabled[1] = !fc.mThreadEnabled[1];
+					fc.mRenderThreads[1].Enabled = !fc.mRenderThreads[1].Enabled;
 					return 21;
 				});
 			kbManager.AddKey(.Kp3, new (delta) =>
 				{
-					fc.mThreadEnabled[2] = !fc.mThreadEnabled[2];
+					fc.mRenderThreads[2].Enabled = !fc.mRenderThreads[2].Enabled;
 					return 21;
 				});
 			kbManager.AddKey(.Kp4, new (delta) =>
 				{
-					fc.mThreadEnabled[3] = !fc.mThreadEnabled[3];
+					fc.mRenderThreads[3].Enabled = !fc.mRenderThreads[3].Enabled;
 					return 21;
 				});
 			kbManager.AddKey(.Kp5, new (delta) =>
 				{
-					fc.mThreadEnabled[4] = !fc.mThreadEnabled[4];
+					fc.mRenderThreads[4].Enabled = !fc.mRenderThreads[4].Enabled;
 					return 21;
 				});
 			kbManager.AddKey(.Kp6, new (delta) =>
 				{
-					fc.mThreadEnabled[5] = !fc.mThreadEnabled[5];
+					fc.mRenderThreads[5].Enabled = !fc.mRenderThreads[5].Enabled;
 					return 21;
 				});
 			kbManager.AddKey(.Kp7, new (delta) =>
 				{
-					fc.mThreadEnabled[6] = !fc.mThreadEnabled[6];
+					fc.mRenderThreads[6].Enabled = !fc.mRenderThreads[6].Enabled;
 					return 21;
 				});
 			kbManager.AddKey(.Kp8, new (delta) =>
 				{
-					fc.mThreadEnabled[7] = !fc.mThreadEnabled[7];
+					fc.mRenderThreads[7].Enabled = !fc.mRenderThreads[7].Enabled;
 					return 21;
 				});
 			kbManager.AddKey(.Kp9, new (delta) =>
 				{
-					fc.mThreadEnabled[8] = !fc.mThreadEnabled[8];
+					//fc.mRenderThreads[8].Enabled = !fc.mRenderThreads[8].Enabled;
 					return 21;
 				});
 		}
@@ -254,6 +272,7 @@ namespace FractelOPOP
 
 		private void setUpHud()
 		{
+			gGameApp.SetTitle("Minced Fractals");
 			int rowIndex = 0;
 			{
 				var label = new DataLabel<double>(&fc.[Friend]currentGraphParameters.yMin, 4, 4 + (28 * (rowIndex++ + 1)));
@@ -314,14 +333,20 @@ namespace FractelOPOP
 			rowIndex++;
 			for (var i in ..<fc.mRenderThreads.Count)
 			{
-				var label = new DataLabel<int64>(&fc.LastRenderingTimes[i + 1], 4, 4 + (28 * (rowIndex++ + 1)));
+				var label = new DataLabel<int64>(&fc.mRenderThreads[i].[Friend]_renderTime, 4, 4 + (28 * (rowIndex++ + 1)));
 				label.GroupId = 3;
 				label.AutoUpdate = false;
 
 				label.ForceUpdateString();
 				timerLabels.Add(label);
 			}
-
+			{
+				var label = new DataLabel<int64>(&fc.mAnimationThread.[Friend]_renderThread.[Friend]_renderTime, 4, 4 + (28 * (rowIndex++ + 1)));
+				label.GroupId = 3;
+				label.AutoUpdate = false;
+				label.ForceUpdateString();
+				animationLabel = label;
+			}
 
 			statusLabel = new DataLabel<bool>(null, 4, 4 + (28 * (rowIndex++ + 1)));
 			statusLabel.[Friend]mformatString = "Rendering Done: {}";
@@ -401,6 +426,7 @@ namespace FractelOPOP
 				{
 					label.Draw(dt);
 				}
+				animationLabel.Draw(dt);
 				statusLabel.Draw(dt);
 				if (lastError != SDL.GetError())
 				{
@@ -410,13 +436,20 @@ namespace FractelOPOP
 						Logger.Error(scope String(lastError));
 					}
 				}
+
+				SDL.SetRenderDrawColor(gGameApp.mRenderer, 255, 255, 255, 255);
+				SDL.RenderDrawRect(gGameApp.mRenderer, &fc.mAnimationThread.[Friend]_targetRect);
+				SDL.SetRenderDrawColor(gGameApp.mRenderer, 0, 0, 0, 255);
 			}
 		}
 
 		public override void Update(int dt)
 		{
 			base.Update(dt);
-
+			if (fc.mAnimationThread.[Friend]animationRunning)
+			{
+				fc.mAnimationThread.AnimateHistory(fc);
+			}
 			if (showLabels > 0)
 			{
 				int visiableLabelCnt = 0;
@@ -439,7 +472,7 @@ namespace FractelOPOP
 				for (var i in ..<timerLabels.Count)
 				{
 					var timerLabel = timerLabels[i];
-					if (fc.mThreadEnabled[i])
+					if (fc.mRenderThreads[i].Enabled && !fc.mAnimationThread.[Friend]animationRunning)
 					{
 						if (timerLabel.UpdateString())
 						{
@@ -463,7 +496,30 @@ namespace FractelOPOP
 						timerLabel.mVisiable = false;
 					}
 				}
+				if (animationLabel.GroupId >= (int)showLabels && fc.mAnimationThread.[Friend]animationRunning)
+				{
+					animationLabel.[Friend]mPointer = &fc.mAnimationThread.[Friend]_renderThread.[Friend]_renderTime;
+					if (animationLabel.UpdateString())
+					{
+						var threadAlive = fc.mAnimationThread.IsAlive;
+						/*if (threadAlive)
+							SafeMemberSet!(label.mColor, new Color(255, 32, 32));
+						else
+							SafeMemberSet!(label.mColor, new Color(64, 255, 64));*/
 
+						var str = new System.String();
+						str.AppendF("Anim({}) : {}", threadAlive ? "Running" : "Idle",
+							TimeSpan((int64) * animationLabel.[Friend]mPointer));
+
+						animationLabel.SetString(str);
+					}
+					animationLabel.mPos.mY = (28 * (visiableLabelCnt++ + 1));
+					animationLabel.mVisiable = true;
+				}
+				else
+				{
+					animationLabel.mVisiable = false;
+				}
 				statusLabel.UpdateString(fc.RenderingDone, true);
 				statusLabel.mPos.mY = (28 * (visiableLabelCnt++ + 1));
 			}
@@ -474,7 +530,7 @@ namespace FractelOPOP
 		public override void MouseDown(SDL2.SDL.MouseButtonEvent evt)
 		{
 			base.MouseDown(evt);
-			if (!holdingMouseDown)
+			if (!holdingMouseDown && !fc.mAnimationThread.[Friend]animationRunning)
 			{
 				zoomRec.Set(evt.x, evt.y);
 				holdingMouseDown = true;
@@ -493,6 +549,8 @@ namespace FractelOPOP
 
 		public override void MouseUp(SDL2.SDL.MouseButtonEvent evt)
 		{
+			if (!holdingMouseDown)
+				return;
 			holdingMouseDown = false;
 
 			const int ZOOM_THREASHOLD = 5;
@@ -501,8 +559,8 @@ namespace FractelOPOP
 			var myPixelManager = fc.GetScreenPixelManager();
 			defer { SafeDeleteNullify!(myPixelManager); }
 
-			var bufferZoomRec = v2d<double>(zoomRec);
-			var bufferZoomRec2 = v2d<double>(evt.x, evt.y);
+			v2d<double> bufferZoomRec = gGameApp.mCam.GetProjected<double>(v2d<double>(zoomRec));
+			v2d<double> bufferZoomRec2 = gGameApp.mCam.GetProjected(v2d<double>(evt.x, evt.y));
 
 			if (RecSize.Width < -ZOOM_THREASHOLD)
 			{
@@ -539,7 +597,7 @@ namespace FractelOPOP
 				fc.PreperRenderImages();
 			} else if ((RecSize.Width > ZOOM_THREASHOLD || RecSize.Width < -ZOOM_THREASHOLD) && (RecSize.Height < -ZOOM_THREASHOLD || RecSize.Height > ZOOM_THREASHOLD))
 			{
-				fc.SetMembers(maxPos.y, minPos.y, minPos.x, maxPos.x, fc.[Friend]currentGraphParameters.kMax);
+				fc.SetGraphParameters(maxPos.y, minPos.y, minPos.x, maxPos.x);
 				fc.[Friend]currentGraphParameters.xOffset = 0;
 				fc.[Friend]currentGraphParameters.yOffset = 0;
 				fc.PreperRenderImages();

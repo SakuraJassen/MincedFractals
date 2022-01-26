@@ -6,15 +6,16 @@ using System;
 using System.Collections;
 using System.Threading;
 using System.Threading.Tasks;
-using FractelOPOP.Entity.FractelOPOP.Entity.FractelChunk;
+using MincedFractals.Entity.FractelOPOP.Entity.FractelChunk;
 
-namespace FractelOPOP.Entity
+namespace MincedFractals.Entity
 {
 	class FractelChunkMultiThread
 	{
 		Vector2D mChunkPos = null ~ SafeDelete!(_);
 
 		private uint32 mDrawCycle = 0;
+		private bool autoUpdateDepth = true;
 
 		GraphParameters currentGraphParameters = .();
 		List<GraphParameters> undoHistory = new List<GraphParameters>() ~ SafeDelete!(_);
@@ -22,14 +23,15 @@ namespace FractelOPOP.Entity
 		private ColourTable colourTable = null ~ SafeDelete!(_);// Colour table.
 
 		volatile private Image mCurrentImage = null;//~ SafeDelete!(_);
-		volatile private Image[] lImages = new Image[16]() ~ DeleteContainerAndItems!(_);
+		//volatile private Image[] lImages = new Image[16]() ~ DeleteContainerAndItems!(_);
 		private Size2D mSize ~ SafeDelete!(_);
 
-		public List<Thread> mRenderThreads = new List<Thread>() ~ DeleteContainerAndItems!(_);
+		public List<RenderThread> mRenderThreads = new List<RenderThread>() ~ DeleteContainerAndItems!(_);
+		public AnimationThread mAnimationThread = new AnimationThread(this) ~ SafeDelete!(_);
+		/*public List<Thread> mRenderThreads = new List<Thread>() ~ DeleteContainerAndItems!(_);
 		volatile public bool[] mThreadEnabled = null ~ SafeDelete!(_);
 		volatile private bool savingImage = false;
-		volatile private int64[] lastRenderingTime = new int64[16]() ~ SafeDelete!(_);
-		public int64[] LastRenderingTimes { get { return Volatile.Read<int64[]>(ref lastRenderingTime); } }
+		volatile private int64[] lastRenderingTime = new int64[16]() ~ SafeDelete!(_);*/
 
 		public bool RenderingDone
 		{
@@ -55,7 +57,7 @@ namespace FractelOPOP.Entity
 			currentGraphParameters.zoomScale = zoomS;
 
 
-			for (var i in ..<lImages.Count)
+			/*for (var i in ..<lImages.Count)
 			{
 				SafeDelete!(lImages[i]);
 				SDL2.Image image = new Image();
@@ -64,14 +66,18 @@ namespace FractelOPOP.Entity
 					SDLError!(1);
 				}
 				lImages[i] = image;
-			}
-			mThreadEnabled = new bool[9];
+			}*/
+			/*mThreadEnabled = new bool[9];
 			mThreadEnabled[0] = true;
 			mThreadEnabled[1] = true;
-			mThreadEnabled[3] = true;
+			mThreadEnabled[3] = true;*/
 
-			for (int32 i in ..<mThreadEnabled.Count)
-				mRenderThreads.Add(new Thread(new () => RenderImageByPixel(i + 1)));
+			for (int32 i in 1 ..< 9)
+				mRenderThreads.Add(new RenderThread(new Thread(new () => RenderImageByPixel(mRenderThreads[i - 1], currentGraphParameters, i)), false, mSize));
+
+			mRenderThreads[0].Enabled = true;
+			mRenderThreads[1].Enabled = true;
+			mRenderThreads[3].Enabled = true;
 
 			SafeMemberSet!(colourTable, new ColourTable(400));
 		}
@@ -87,22 +93,38 @@ namespace FractelOPOP.Entity
 			mSize = size;
 		}
 
-		public void SetMembers(double yMinimum, double yMaximum, double xMinimum, double xMaximum, double kMaximum = 700, int zoomS = 1)
+		public void SetGraphParameters(double yMinimum, double yMaximum, double xMinimum, double xMaximum, double kMaximum = -1, int zoomS = 1)
 		{
 			undoHistory.Add(currentGraphParameters);
 			currentGraphParameters.yMin = yMinimum;
 			currentGraphParameters.yMax = yMaximum;
 			currentGraphParameters.xMin = xMinimum;
 			currentGraphParameters.xMax = xMaximum;
-			currentGraphParameters.kMax = kMaximum;
+			if (autoUpdateDepth && kMaximum == -1)
+			{
+				var absXMin = Math.Abs(xMinimum);
+				var absXMax = Math.Abs(xMaximum);
+				double xRange = 0;
+				if (absXMin > absXMax)
+					xRange = absXMin - absXMax;
+				else
+					xRange = absXMax - absXMin;
+
+				double pow = Math.Pow(xRange, -0.163d);
+				Logger.Debug(pow, xRange);
+				var k = 400 * pow;
+				currentGraphParameters.kMax = k;
+			}
+			else
+				currentGraphParameters.kMax = kMaximum;
 			currentGraphParameters.zoomScale = zoomS;
 		}
 
 		public ~this()
 		{
-			for (var i in ..<mThreadEnabled.Count)
+			for (var thread in mRenderThreads)
 			{
-				mThreadEnabled[i] = false;
+				thread.RequestAbort();
 			}
 			while (!RenderingDone)
 			{
@@ -114,21 +136,24 @@ namespace FractelOPOP.Entity
 		{
 			Vector2D projectedPos = gGameApp.mCam.GetProjected(scope Vector2D(0, mSize.Height / 1000));
 			defer delete projectedPos;
-
+			var image = mCurrentImage;
+			if (mAnimationThread.[Friend]mCurrentImage != null)
+			{
+				image = mAnimationThread.[Friend]mCurrentImage;
+			}
 			//mCurrentImage should always be a ref to the last Image that got completely rendered.
-			if (mCurrentImage?.mTexture == null)
+			if (image?.mTexture == null)
 				return;
-			gEngineApp.Draw(mCurrentImage, projectedPos.mX, projectedPos.mY, 0f, gGameApp.mCam.mSize);//mPos.mX, mPos.mY, mDrawAngle);
+			gEngineApp.Draw(image, projectedPos.mX, projectedPos.mY, 0f, gGameApp.mCam.mSize);//mPos.mX, mPos.mY, mDrawAngle);
 		}
 
 		public void PreperRenderImages()
 		{
-			List<bool> lbool = scope List<bool>();
-
-			for (var i in ..<mThreadEnabled.Count)
+			if (mAnimationThread.[Friend]animationRunning)
+				return;
+			for (var thread in mRenderThreads)
 			{
-				lbool.Add(mThreadEnabled[i]);
-				mThreadEnabled[i] = false;
+				thread.RequestAbort();
 			}
 			var cnt = 0;
 			while (!RenderingDone)
@@ -137,55 +162,60 @@ namespace FractelOPOP.Entity
 				if (++cnt > 1000)
 					break;
 			}
-			for (var i in ..<lbool.Count)
+			for (var thread in mRenderThreads)
 			{
-				mThreadEnabled[i] = lbool[i];
+				thread.[Friend]_shouldAbort = false;
 			}
 			for (var i in ..<mRenderThreads.Count)
 			{
-				if (mThreadEnabled[i])
+				if (mRenderThreads[i].Enabled)
 				{
 					var t = mRenderThreads[i];
-					t.Interrupt();
 					while (t.IsAlive)
 					{
-						SDL.Delay(20);
+						SDL.Delay(20);// Fail safe
 					}
-					t.Start(false);
+					t.StartThread();
 				}
 			}
 		}
 
-		public void RenderImageByPixel(int32 pixelStep)
+		public void RenderImageByPixel(RenderThread self, GraphParameters gp, int32 pixelStep, bool saveImage = true)
 		{
-			var images = Volatile.Read<Image>(ref lImages[pixelStep]);
-			var ret = GetRenderImage(images, currentGraphParameters.yMin / currentGraphParameters.zoomScale + currentGraphParameters.yOffset,
-				(currentGraphParameters.yMax) / currentGraphParameters.zoomScale + currentGraphParameters.yOffset,
-				(currentGraphParameters.xMin) / currentGraphParameters.zoomScale + currentGraphParameters.xOffset,
-				(currentGraphParameters.xMax) / currentGraphParameters.zoomScale + currentGraphParameters.xOffset,
-				(int32)(currentGraphParameters.kMax + (currentGraphParameters.zoomScale / 10)), pixelStep);
+			self.[Friend]_finishedRendering = false;
+			var ret = GetRenderImage(self, gp, pixelStep);
 			switch (ret)
 			{
 			case .Err(let err):
+				self.[Friend]_shouldAbort = false;
 				return;
 			case .Ok(let retImage):
-				Volatile.Write<Image>(ref mCurrentImage, images);
+				if (saveImage)
+					Volatile.Write<Image>(ref mCurrentImage, self.[Friend]_renderedImage);
 			}
-			logCurrentTime(LastRenderingTimes[pixelStep] + 1, pixelStep);
-			Logger.Debug(StackStringFormat!("{} : {}", pixelStep, TimeSpan(LastRenderingTimes[pixelStep])));
+			self.[Friend]_renderTime += 1;
+			self.[Friend]_finishedRendering = true;
+			Logger.Debug(StackStringFormat!("{} : {}", pixelStep, TimeSpan(self.RenderTime)));
 		}
 
-
-
-		public Result<SDL2.Image> GetRenderImage(Image image, double yMin, double yMax, double xMin, double xMax, int32 kMax, int32 pixelStep)
+		public Result<SDL2.Image> GetRenderImage(RenderThread self, GraphParameters gp, int32 pixelStep)
 		{
-			Volatile.Write<int64>(ref lastRenderingTime[pixelStep], 0);
+			return GetRenderImage(self, self.[Friend]_renderedImage, gp, gp.yMin / gp.zoomScale + gp.yOffset,
+				(gp.yMax) / gp.zoomScale + gp.yOffset,
+				(gp.xMin) / gp.zoomScale + gp.xOffset,
+				(gp.xMax) / gp.zoomScale + gp.xOffset,
+				(int32)(gp.kMax + (gp.zoomScale / 10)), pixelStep);
+		}
+
+		public Result<SDL2.Image> GetRenderImage(RenderThread self, Image image, GraphParameters gp, double yMin, double yMax, double xMin, double xMax, int32 kMax, int32 pixelStep)
+		{
+			self.[Friend]_renderTime = 0;
 
 			var err = SDL.LockTexture(image.mTexture, null, var data, var pitch);
 			if (err != 0)
 			{
 				Logger.Debug(scope String(SDL.GetError()));
-				logCurrentTime(-1, pixelStep);
+				self.[Friend]_renderTime = -1;
 				SDL.UnlockTexture(image.mTexture);
 				SDLError!(err);
 				return .Err((void)"Thread terminated");
@@ -202,7 +232,12 @@ namespace FractelOPOP.Entity
 			SDL2.SDL.Color colorLast = .();
 
 
-			var myPixelManager = GetScreenPixelManager();
+			//var myPixelManager = GetScreenPixelManager(gp);
+			ComplexPoint screenBottomLeft = ComplexPoint(xMin,
+				yMin);
+			ComplexPoint screenTopRight = ComplexPoint(xMax,
+				yMax);
+			var myPixelManager = new ScreenPixelManage(gGameApp.mRenderer, screenBottomLeft, screenTopRight);
 			ComplexPoint xyStep = myPixelManager.GetDeltaMathsCoord(ComplexPoint(pixelStep, pixelStep));
 			double min = 1d / Math.Pow((double)10, (double)15);
 			xyStep.x = Math.Max(xyStep.x, min);
@@ -213,16 +248,19 @@ namespace FractelOPOP.Entity
 			sw.Start();
 
 			int yPix = (int)mSize.Height - 1;
+			Logger.Debug("Y", (Math.Abs(yMin) + Math.Abs(yMax)) / xyStep.y);
+			Logger.Debug("X", (Math.Abs(xMin) + Math.Abs(xMin)) / xyStep.x);
 			for (double y = yMin; y < yMax; y += xyStep.y)
 			{
-				if (!mThreadEnabled[pixelStep - 1])
+				if (self.[Friend]_shouldAbort)
 				{
-					logCurrentTime(-1, pixelStep);
+					self.[Friend]_renderTime = -1;
 					SDL.UnlockTexture(image.mTexture);
 					return .Err((void)"Thread terminated");
 				}
 
 				int xPix = 0;
+
 				for (double x = xMin; x < xMax; x += xyStep.x)
 				{
 					double cx = x;
@@ -304,6 +342,10 @@ namespace FractelOPOP.Entity
 						}
 					}
 					xPix += pixelStep;
+					if (sw.ElapsedMicroseconds - self.[Friend]_renderTime >= 100000)
+					{
+						self.[Friend]_renderTime = sw.ElapsedMicroseconds;
+					}
 				}
 				yPix -= pixelStep;
 				/*if (yPix < 0)
@@ -314,36 +356,23 @@ namespace FractelOPOP.Entity
 					SDL.UnlockTexture(image.mTexture);
 					return .Ok(null);
 				}*/
-				if (sw.ElapsedMicroseconds - getCurrentTime(pixelStep) >= 100000)
-				{
-					logCurrentTime(sw.ElapsedMicroseconds, pixelStep);
-				}
 			}
 
 			sw.Stop();
-			logCurrentTime(sw.ElapsedMicroseconds, pixelStep);
-
 			SDL.UnlockTexture(image.mTexture);
+			self.[Friend]_renderTime = sw.ElapsedMicroseconds;
+
 			return .Ok(null);
 		}
 
-		void logCurrentTime(int64 renderingTime, int pixelStep)
-		{
-			Volatile.Write<int64>(ref lastRenderingTime[pixelStep], renderingTime);
-		}
-
-		int64 getCurrentTime(int pixelStep)
-		{
-			return Volatile.Read<int64>(ref lastRenderingTime[pixelStep]);
-		}
-
-		public void Undo()
+		public void Undo(bool undoK = false)
 		{
 			if (undoHistory.Count > 0)
 			{
 				var oldkMax = currentGraphParameters.kMax;
 				currentGraphParameters = undoHistory.PopBack();
-				currentGraphParameters.kMax = oldkMax;
+				if (undoK)
+					currentGraphParameters.kMax = oldkMax;
 			}
 		}
 
@@ -371,6 +400,15 @@ namespace FractelOPOP.Entity
 				currentGraphParameters.yMin / currentGraphParameters.zoomScale + currentGraphParameters.yOffset);
 			ComplexPoint screenTopRight = ComplexPoint(currentGraphParameters.xMax / currentGraphParameters.zoomScale + currentGraphParameters.xOffset,
 				currentGraphParameters.yMax / currentGraphParameters.zoomScale + currentGraphParameters.yOffset);
+			return new ScreenPixelManage(gGameApp.mRenderer, screenBottomLeft, screenTopRight);
+		}
+
+		public ScreenPixelManage GetScreenPixelManager(GraphParameters gp)
+		{
+			ComplexPoint screenBottomLeft = ComplexPoint(gp.xMin / gp.zoomScale + gp.xOffset,
+				gp.yMin / gp.zoomScale + gp.yOffset);
+			ComplexPoint screenTopRight = ComplexPoint(gp.xMax / gp.zoomScale + gp.xOffset,
+				gp.yMax / gp.zoomScale + gp.yOffset);
 			return new ScreenPixelManage(gGameApp.mRenderer, screenBottomLeft, screenTopRight);
 		}
 
@@ -422,6 +460,158 @@ namespace FractelOPOP.Entity
 	{
 		struct Depth
 		{
+		}
+
+		public class AnimationThread
+		{
+			RenderThread _renderThread = null ~ SafeDelete!(_);
+			int animationIndex = 0;
+			bool animationRunning = false;
+			Image mCurrentImage = null ~ SafeDelete!(_);
+			int presentDelay = -1;
+			Stopwatch presentDelayer = new Stopwatch() ~ SafeDelete!(_);
+			public List<GraphParameters> animationHistory = new List<GraphParameters>() ~ SafeDelete!(_);
+
+			public bool IsAlive { get { return (bool)_renderThread?.IsAlive; } }
+			SDL.Rect _targetRect = default;
+			public this(FractelChunkMultiThread fc)
+			{
+				SafeMemberSet!(_renderThread, new RenderThread(new Thread(new () => fc.RenderImageByPixel(_renderThread, animationHistory[animationIndex++], 1, false)), false, fc.[Friend]mSize));
+			}
+
+			public void StopAnimation()
+			{
+				animationRunning = false;
+				presentDelay = -1;
+				_targetRect = .(0, 0, 0, 0);
+				SafeMemberSet!(mCurrentImage, null);
+			}
+
+			public void AnimateHistory(FractelChunkMultiThread fc, int numThread = 1)
+			{
+				if (_renderThread != null)
+				{
+					if (!_renderThread.IsAlive)
+					{
+						if (presentDelay == -1)
+						{
+							presentDelay = _renderThread.RenderTime;
+
+							_targetRect = .(0, 0, 0, 0);
+
+							Logger.Debug(TimeSpan(presentDelay), presentDelay);
+
+							presentDelayer.Restart();
+							SafeMemberSet!(mCurrentImage, _renderThread.[Friend]_renderedImage);
+							_renderThread.[Friend]_renderedImage = null;
+							if ((animationIndex) < animationHistory.Count && animationIndex >= 1)
+							{
+								var next = animationHistory[animationIndex];
+								var manager = fc.GetScreenPixelManager(animationHistory[animationIndex - 1]);
+								defer { SafeDeleteNullify!(manager); }
+
+								var minPos = manager.GetPixelCoord(v2d<double>(next.xMin, next.yMin));// bot left
+								var maxPos = manager.GetPixelCoord(v2d<double>(next.xMax, next.yMax));//top right
+								var width = (maxPos.x - minPos.x);
+								var height = (minPos.y - maxPos.y);
+
+								_targetRect.x = (int32)minPos.x;
+								_targetRect.y = (int32)maxPos.y;
+
+								_targetRect.w = (int32)width;
+								_targetRect.h = (int32)height;
+							}
+						}
+						if (presentDelayer.ElapsedMicroseconds > (TimeSpan.TicksPerSecond - presentDelay * 2))
+						{
+							if (animationIndex >= animationHistory.Count)
+							{
+								StopAnimation();
+								return;
+							}
+
+							SafeMemberSet!(_renderThread, new RenderThread(new Thread(new () => fc.RenderImageByPixel(_renderThread, animationHistory[animationIndex++], 1, false)), false, fc.[Friend]mSize));
+							_renderThread.Enabled = true;
+							_renderThread.StartThread();
+							presentDelayer.Stop();
+							presentDelayer.Reset();
+							presentDelay = -1;
+						}
+						else
+						{
+							_renderThread.[Friend]_renderTime = presentDelayer.ElapsedMicroseconds + presentDelay;
+						}
+					}
+				}
+			}
+
+			public void StartAnimation(FractelChunkMultiThread fc)
+			{
+				if (animationHistory.Count == 0)
+					return;
+				if (animationRunning)
+				{
+					_renderThread.RequestAbort();
+					while (_renderThread.IsAlive)
+					{
+						SDL.Delay(10);
+					}
+				}
+				animationIndex = 0;
+				SafeMemberSet!(_renderThread, new RenderThread(new Thread(new () => fc.RenderImageByPixel(_renderThread, animationHistory[animationIndex++], 1, false)), false, fc.[Friend]mSize));
+				_renderThread.Enabled = true;
+				_renderThread.StartThread();
+				animationRunning = true;
+			}
+
+			public void CopyAnimation(List<GraphParameters> gp)
+			{
+				animationHistory.Clear();
+				for (var para in gp)
+				{
+					animationHistory.Add(para);
+				}
+			}
+		}
+
+		public class RenderThread
+		{
+			Thread _mainThread = null ~ SafeDelete!(_);
+			bool _shouldAbort = false;
+			bool _enabled = false;
+			public bool Enabled { get { return _enabled; } set { _enabled = value; } }
+			bool _savingImage = false;
+			Image _renderedImage = null ~ SafeDelete!(_);
+			Image _bufferImage = null ~ SafeDelete!(_);
+			int64 _renderTime = -1;
+			public int64 RenderTime { get { return _renderTime; } }
+			bool _finishedRendering = false;
+			public bool finishedRendering { get { return _finishedRendering; } }
+
+			public bool IsAlive { get { return (bool)_mainThread?.IsAlive; } }
+
+			public this(Thread mainThread, bool enabled, Size2D size)
+			{
+				_enabled = enabled;
+				_mainThread = mainThread;
+
+				SDL2.Image image = new Image();
+				if (DrawUtils.CreateTexture(image, size, gEngineApp.mRenderer, .Streaming) case .Err(let err))
+				{
+					SDLError!(1);
+				}
+				_renderedImage = image;
+			}
+
+			public void StartThread()
+			{
+				_mainThread?.Start(false);
+			}
+
+			public void RequestAbort()
+			{
+				_shouldAbort = true;
+			}
 		}
 
 		public struct GraphParameters

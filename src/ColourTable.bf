@@ -1,7 +1,7 @@
 using System;
 using BasicEngine.Debug;
 using BasicEngine;
-namespace FractelOPOP
+namespace MincedFractals
 {
 		/// <summary>
 		/// Class used for colour lookup table.

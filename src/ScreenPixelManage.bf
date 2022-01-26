@@ -1,5 +1,5 @@
 using BasicEngine;
-namespace FractelOPOP
+namespace MincedFractals
 {
 	class ScreenPixelManage
 	{

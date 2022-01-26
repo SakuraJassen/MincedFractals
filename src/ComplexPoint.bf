@@ -1,5 +1,5 @@
 using System;
-namespace FractelOPOP
+namespace MincedFractals
 {
 	struct ComplexPoint
 	{
