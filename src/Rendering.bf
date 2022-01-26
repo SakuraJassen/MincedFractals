@@ -80,6 +80,8 @@ namespace MincedFractals
 			kbManager.AddKey(.Period, new (delta) =>
 				{
 					fc.mAnimationThread.CopyAnimation(fc.[Friend]undoHistory);
+					fc.mAnimationThread.animationHistory.Add(fc.[Friend]currentGraphParameters);
+					fc.mAnimationThread.SmoothAnimation(0.01f);
 					fc.mAnimationThread.StartAnimation(fc);
 					Logger.Info("Start Animation");
 
@@ -90,6 +92,14 @@ namespace MincedFractals
 				{
 					fc.mAnimationThread.StopAnimation();
 					Logger.Info("Stop Animation");
+
+					return 20;
+				});
+
+			kbManager.AddKey(.V, new (delta) =>
+				{
+					fc.[Friend]undoHistory.Clear();
+					Logger.Info("Clear undoHistory");
 
 					return 20;
 				});
@@ -388,31 +398,8 @@ namespace MincedFractals
 
 			if (holdingMouseDown)
 			{
-				var myPixelManager = fc.GetScreenPixelManager();
-				defer { SafeDeleteNullify!(myPixelManager); }
-				SDL2.SDL.Rect* rect = scope .();
-				rect.x = (int32)zoomRec.mX;
-				rect.y = (int32)zoomRec.mY;
-				int32 mouseX = 0;
-				int32 mouseY = 0;
-				SDL.GetMouseState(&mouseX, &mouseY);
-				//var maxPos = myPixelManager.GetAbsoluteMathsCoord(v2d<double>(mouseX, mouseY));
-
-				if (kbManager.KeyDown(.LCtrl))
-				{
-					/*var scalingY = Math.Abs(fc.[Friend]currentGraphParameters.yMax / fc.[Friend]currentGraphParameters.yMin);
-					var scalingX = Math.Abs(fc.[Friend]currentGraphParameters.xMax / fc.[Friend]currentGraphParameters.xMin);*/
-					rect.w = (mouseX - (int32)zoomRec.mX) * 2;
-					rect.h = (mouseY - (int32)zoomRec.mY) * 2;
-					rect.y -= rect.h / 2;
-					rect.x -= rect.w / 2;
-				} else
-				{
-					rect.w = mouseX - (int32)zoomRec.mX;
-					rect.h = mouseY - (int32)zoomRec.mY;
-				}
 				SDL.SetRenderDrawColor(gGameApp.mRenderer, 255, 255, 255, 255);
-				SDL.RenderDrawRect(gGameApp.mRenderer, rect);
+				SDL.RenderDrawRect(gGameApp.mRenderer, &zoomRect);
 				SDL.SetRenderDrawColor(gGameApp.mRenderer, 0, 0, 0, 255);
 			}
 			if (showLabels > 0)
@@ -437,9 +424,9 @@ namespace MincedFractals
 					}
 				}
 
-				SDL.SetRenderDrawColor(gGameApp.mRenderer, 255, 255, 255, 255);
+				/*SDL.SetRenderDrawColor(gGameApp.mRenderer, 255, 255, 255, 255);
 				SDL.RenderDrawRect(gGameApp.mRenderer, &fc.mAnimationThread.[Friend]_targetRect);
-				SDL.SetRenderDrawColor(gGameApp.mRenderer, 0, 0, 0, 255);
+				SDL.SetRenderDrawColor(gGameApp.mRenderer, 0, 0, 0, 255);*/
 			}
 		}
 
@@ -508,7 +495,7 @@ namespace MincedFractals
 							SafeMemberSet!(label.mColor, new Color(64, 255, 64));*/
 
 						var str = new System.String();
-						str.AppendF("Anim({}) : {}", threadAlive ? "Running" : "Idle",
+						str.AppendF("Anim({})({}/{}) : {}", threadAlive ? "Running" : "Idle", fc.mAnimationThread.[Friend]animationIndex, fc.mAnimationThread.animationHistory.Count,
 							TimeSpan((int64) * animationLabel.[Friend]mPointer));
 
 						animationLabel.SetString(str);
@@ -523,16 +510,71 @@ namespace MincedFractals
 				statusLabel.UpdateString(fc.RenderingDone, true);
 				statusLabel.mPos.mY = (28 * (visiableLabelCnt++ + 1));
 			}
+
+			if (holdingMouseDown)
+			{
+				var myPixelManager = fc.GetScreenPixelManager();
+				defer { SafeDeleteNullify!(myPixelManager); }
+				zoomRect.x = (int32)startClickPos.mX;
+				zoomRect.y = (int32)startClickPos.mY;
+				int32 mouseX = 0;
+				int32 mouseY = 0;
+				SDL.GetMouseState(&mouseX, &mouseY);
+
+				if (!kbManager.KeyDown(.LCtrl))
+				{
+					if (kbManager.KeyDown(.LAlt))
+					{
+						zoomRect.w = Math.Abs(mouseX - (int32)startClickPos.mX) * 2;
+						zoomRect.h = Math.Abs(mouseY - (int32)startClickPos.mY) * 2;
+						zoomRect.x = (int32)startClickPos.mX - (zoomRect.w / 2);
+						zoomRect.y = (int32)startClickPos.mY - (zoomRect.h / 2);
+					}
+					else
+					{
+
+					/*var graphH = Math.Abs(fc.[Friend]currentGraphParameters.yMax) + Math.Abs(fc.[Friend]currentGraphParameters.yMin);
+					var graphW = Math.Abs(fc.[Friend]currentGraphParameters.xMax) + Math.Abs(fc.[Friend]currentGraphParameters.xMin);*/
+
+						zoomRect.w = (mouseX - (int32)startClickPos.mX);
+					//zoomRect.h = (mouseY - (int32)startClickPos.mY) * 2;
+
+						float scale = ((float)gGameApp.mScreen.h / (float)gGameApp.mScreen.w);
+						zoomRect.h = (int32)(zoomRect.w * scale);
+
+					//float scale = ((float)graphH / (float)graphW);
+					/*if (mouseX > mouseY)
+					{
+						zoomRect.h = (int32)(zoomRect.w * scale);
+					}
+					else
+					{
+						zoomRect.w = (int32)(zoomRect.h * scale);
+					}*/
+						zoomRect.w *= 2;
+						zoomRect.h *= 2;
+						zoomRect.x = (int32)startClickPos.mX - (zoomRect.w / 2);
+						zoomRect.y = (int32)startClickPos.mY - (zoomRect.h / 2);
+						if (zoomRect.h > 0 && zoomRect.w > 0)
+							Logger.Debug((float)zoomRect.h / (float)zoomRect.w);
+					}
+				} else
+				{
+					zoomRect.w = mouseX - (int32)startClickPos.mX;
+					zoomRect.h = mouseY - (int32)startClickPos.mY;
+				}
+			}
 		}
 
-		Vector2D zoomRec = new Vector2D(0, 0) ~ SafeDelete!(_);
+		Vector2D startClickPos = new Vector2D(0, 0) ~ SafeDelete!(_);
+		SDL.Rect zoomRect = SDL.Rect();
 		bool holdingMouseDown = false;
 		public override void MouseDown(SDL2.SDL.MouseButtonEvent evt)
 		{
 			base.MouseDown(evt);
 			if (!holdingMouseDown && !fc.mAnimationThread.[Friend]animationRunning)
 			{
-				zoomRec.Set(evt.x, evt.y);
+				startClickPos.Set(evt.x, evt.y);
 				holdingMouseDown = true;
 			}
 			for (let entity in gEngineApp.mEntityList.mLayers[(int)LayeredList.LayerNames.HUD].mEntities)
@@ -554,13 +596,13 @@ namespace MincedFractals
 			holdingMouseDown = false;
 
 			const int ZOOM_THREASHOLD = 5;
-			Size2D RecSize = scope .(evt.x - zoomRec.mX, evt.y - zoomRec.mY);
+			Size2D RecSize = scope .(zoomRect.h, zoomRect.w);
 
 			var myPixelManager = fc.GetScreenPixelManager();
 			defer { SafeDeleteNullify!(myPixelManager); }
 
-			v2d<double> bufferZoomRec = gGameApp.mCam.GetProjected<double>(v2d<double>(zoomRec));
-			v2d<double> bufferZoomRec2 = gGameApp.mCam.GetProjected(v2d<double>(evt.x, evt.y));
+			v2d<double> bufferZoomRec = gGameApp.mCam.GetProjected(v2d<double>(zoomRect.x, zoomRect.y));
+			v2d<double> bufferZoomRec2 = gGameApp.mCam.GetProjected(v2d<double>(zoomRect.x + zoomRect.w, zoomRect.y + zoomRect.h));
 
 			if (RecSize.Width < -ZOOM_THREASHOLD)
 			{
@@ -570,10 +612,13 @@ namespace MincedFractals
 			{
 				Swap!(bufferZoomRec.y, bufferZoomRec2.y);
 			}
+
 			var minPos = myPixelManager.GetAbsoluteMathsCoord(bufferZoomRec);
 			var maxPos = myPixelManager.GetAbsoluteMathsCoord(bufferZoomRec2);
-
-			if (kbManager.KeyDown(.LCtrl))
+			var width = Math.Abs(maxPos.x) + Math.Abs(minPos.x);
+			var height = Math.Abs(maxPos.y) + Math.Abs(minPos.y);
+			Logger.Debug(height / width);
+			/*if (kbManager.KeyDown(.LCtrl))
 			{
 				/*var scalingY = fc.[Friend]currentGraphParameters.yMax / yMax;
 				var scalingX = fc.[Friend]currentGraphParameters.xMax / maxPos.x;
@@ -581,11 +626,27 @@ namespace MincedFractals
 				maxPos.y = maxPos.y / scalingY;
 				maxPos.x = maxPos.y / scalingX;*/
 
-				var width = (maxPos.x - minPos.x) * 2;
-				var height = (maxPos.y - minPos.y) * 2;
+				var graphH = Math.Abs(fc.[Friend]currentGraphParameters.yMax) +
+			Math.Abs(fc.[Friend]currentGraphParameters.yMin); var graphW =
+			Math.Abs(fc.[Friend]currentGraphParameters.xMax) + Math.Abs(fc.[Friend]currentGraphParameters.xMin); float
+			scale = ((float)graphH / (float)graphW);
+
+				var width = Math.Abs(maxPos.x) + Math.Abs(minPos.x);
+				var height = Math.Abs(maxPos.y) + Math.Abs(minPos.y);
+
+				if (maxPos.x > maxPos.y)
+				{
+					height = (int32)(width * scale);
+				}
+				else
+				{
+					width = (int32)(height * scale);
+				}
+
+
 				minPos.x -= width / 2;
 				minPos.y -= height / 2;
-			}
+			}*/
 
 			Logger.Debug(minPos.x, minPos.y);
 			Logger.Debug(maxPos.x, maxPos.y);

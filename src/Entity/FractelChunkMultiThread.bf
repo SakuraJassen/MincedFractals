@@ -467,6 +467,7 @@ namespace MincedFractals.Entity
 			RenderThread _renderThread = null ~ SafeDelete!(_);
 			int animationIndex = 0;
 			bool animationRunning = false;
+			bool instantPresent = true;
 			Image mCurrentImage = null ~ SafeDelete!(_);
 			int presentDelay = -1;
 			Stopwatch presentDelayer = new Stopwatch() ~ SafeDelete!(_);
@@ -504,6 +505,12 @@ namespace MincedFractals.Entity
 							presentDelayer.Restart();
 							SafeMemberSet!(mCurrentImage, _renderThread.[Friend]_renderedImage);
 							_renderThread.[Friend]_renderedImage = null;
+
+							var basename = scope String();
+							basename.AppendF(".\\png\\ani\\{}.png", animationIndex);
+#if SAVING
+							SDLError!(mCurrentImage.SaveTexture(basename, gGameApp.mRenderer));
+#endif
 							if ((animationIndex) < animationHistory.Count && animationIndex >= 1)
 							{
 								var next = animationHistory[animationIndex];
@@ -522,7 +529,7 @@ namespace MincedFractals.Entity
 								_targetRect.h = (int32)height;
 							}
 						}
-						if (presentDelayer.ElapsedMicroseconds > (TimeSpan.TicksPerSecond - presentDelay * 2))
+						if (instantPresent || presentDelayer.ElapsedMicroseconds > ((TimeSpan.TicksPerSecond / 2) - presentDelay))
 						{
 							if (animationIndex >= animationHistory.Count)
 							{
@@ -571,6 +578,38 @@ namespace MincedFractals.Entity
 				{
 					animationHistory.Add(para);
 				}
+			}
+
+			public void SmoothAnimation(float pct)
+			{
+				List<GraphParameters> buffer = scope List<GraphParameters>();
+				for (int i in ..<animationHistory.Count)
+				{
+					buffer.Add(animationHistory[i]);
+					if (i + 1 < animationHistory.Count)
+					{
+						var current = animationHistory[i];
+						var next = animationHistory[i + 1];
+						for (int x = 1; x < 100 / (pct * 100); x++)
+						{
+							GraphParameters gp = GraphParameters();
+							if (pct * x >= 1f)
+								break;
+							gp.xMin = Math.Lerp(current.xMin, next.xMin, pct * x);
+							gp.xMax = Math.Lerp(current.xMax, next.xMax, pct * x);
+							gp.yMin = Math.Lerp(current.yMin, next.yMin, pct * x);
+							gp.yMax = Math.Lerp(current.yMax, next.yMax, pct * x);
+							gp.kMax = Math.Lerp(current.kMax, next.kMax, pct * x);
+							buffer.Add(gp);
+							if (x == 9)
+							{
+								NOP!();
+							}
+						}
+					}
+				}
+
+				CopyAnimation(buffer);
 			}
 		}
 
