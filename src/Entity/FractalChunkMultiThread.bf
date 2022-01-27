@@ -6,11 +6,11 @@ using System;
 using System.Collections;
 using System.Threading;
 using System.Threading.Tasks;
-using MincedFractals.Entity.FractelOPOP.Entity.FractelChunk;
+using MincedFractals.Entity.FractalChunk;
 
 namespace MincedFractals.Entity
 {
-	class FractelChunkMultiThread
+	class FractalChunkMultiThread
 	{
 		Vector2D mChunkPos = null ~ SafeDelete!(_);
 
@@ -249,7 +249,7 @@ namespace MincedFractals.Entity
 
 			int yPix = (int)mSize.Height - 1;
 			Logger.Debug("Y", (Math.Abs(yMin) + Math.Abs(yMax)) / xyStep.y);
-			Logger.Debug("X", (Math.Abs(xMin) + Math.Abs(xMin)) / xyStep.x);
+			Logger.Debug("X", (Math.Abs(xMin) + Math.Abs(xMax)) / xyStep.x);
 			for (double y = yMin; y < yMax; y += xyStep.y)
 			{
 				if (self.[Friend]_shouldAbort)
@@ -453,216 +453,6 @@ namespace MincedFractals.Entity
 			uint8 alpha = (uint8)temp;
 
 			return .(red, green, blue, alpha);
-		}
-	}
-
-	namespace FractelOPOP.Entity.FractelChunk
-	{
-		struct Depth
-		{
-		}
-
-		public class AnimationThread
-		{
-			RenderThread _renderThread = null ~ SafeDelete!(_);
-			int animationIndex = 0;
-			bool animationRunning = false;
-			bool instantPresent = true;
-			Image mCurrentImage = null ~ SafeDelete!(_);
-			int presentDelay = -1;
-			Stopwatch presentDelayer = new Stopwatch() ~ SafeDelete!(_);
-			public List<GraphParameters> animationHistory = new List<GraphParameters>() ~ SafeDelete!(_);
-
-			public bool IsAlive { get { return (bool)_renderThread?.IsAlive; } }
-			SDL.Rect _targetRect = default;
-			public this(FractelChunkMultiThread fc)
-			{
-				SafeMemberSet!(_renderThread, new RenderThread(new Thread(new () => fc.RenderImageByPixel(_renderThread, animationHistory[animationIndex++], 1, false)), false, fc.[Friend]mSize));
-			}
-
-			public void StopAnimation()
-			{
-				animationRunning = false;
-				presentDelay = -1;
-				_targetRect = .(0, 0, 0, 0);
-				SafeMemberSet!(mCurrentImage, null);
-			}
-
-			public void AnimateHistory(FractelChunkMultiThread fc, int numThread = 1)
-			{
-				if (_renderThread != null)
-				{
-					if (!_renderThread.IsAlive)
-					{
-						if (presentDelay == -1)
-						{
-							presentDelay = _renderThread.RenderTime;
-
-							_targetRect = .(0, 0, 0, 0);
-
-							Logger.Debug(TimeSpan(presentDelay), presentDelay);
-
-							presentDelayer.Restart();
-							SafeMemberSet!(mCurrentImage, _renderThread.[Friend]_renderedImage);
-							_renderThread.[Friend]_renderedImage = null;
-
-							var basename = scope String();
-							basename.AppendF(".\\png\\ani\\{}.png", animationIndex);
-#if SAVING
-							SDLError!(mCurrentImage.SaveTexture(basename, gGameApp.mRenderer));
-#endif
-							if ((animationIndex) < animationHistory.Count && animationIndex >= 1)
-							{
-								var next = animationHistory[animationIndex];
-								var manager = fc.GetScreenPixelManager(animationHistory[animationIndex - 1]);
-								defer { SafeDeleteNullify!(manager); }
-
-								var minPos = manager.GetPixelCoord(v2d<double>(next.xMin, next.yMin));// bot left
-								var maxPos = manager.GetPixelCoord(v2d<double>(next.xMax, next.yMax));//top right
-								var width = (maxPos.x - minPos.x);
-								var height = (minPos.y - maxPos.y);
-
-								_targetRect.x = (int32)minPos.x;
-								_targetRect.y = (int32)maxPos.y;
-
-								_targetRect.w = (int32)width;
-								_targetRect.h = (int32)height;
-							}
-						}
-						if (instantPresent || presentDelayer.ElapsedMicroseconds > ((TimeSpan.TicksPerSecond / 2) - presentDelay))
-						{
-							if (animationIndex >= animationHistory.Count)
-							{
-								StopAnimation();
-								return;
-							}
-
-							SafeMemberSet!(_renderThread, new RenderThread(new Thread(new () => fc.RenderImageByPixel(_renderThread, animationHistory[animationIndex++], 1, false)), false, fc.[Friend]mSize));
-							_renderThread.Enabled = true;
-							_renderThread.StartThread();
-							presentDelayer.Stop();
-							presentDelayer.Reset();
-							presentDelay = -1;
-						}
-						else
-						{
-							_renderThread.[Friend]_renderTime = presentDelayer.ElapsedMicroseconds + presentDelay;
-						}
-					}
-				}
-			}
-
-			public void StartAnimation(FractelChunkMultiThread fc)
-			{
-				if (animationHistory.Count == 0)
-					return;
-				if (animationRunning)
-				{
-					_renderThread.RequestAbort();
-					while (_renderThread.IsAlive)
-					{
-						SDL.Delay(10);
-					}
-				}
-				animationIndex = 0;
-				SafeMemberSet!(_renderThread, new RenderThread(new Thread(new () => fc.RenderImageByPixel(_renderThread, animationHistory[animationIndex++], 1, false)), false, fc.[Friend]mSize));
-				_renderThread.Enabled = true;
-				_renderThread.StartThread();
-				animationRunning = true;
-			}
-
-			public void CopyAnimation(List<GraphParameters> gp)
-			{
-				animationHistory.Clear();
-				for (var para in gp)
-				{
-					animationHistory.Add(para);
-				}
-			}
-
-			public void SmoothAnimation(float pct)
-			{
-				List<GraphParameters> buffer = scope List<GraphParameters>();
-				for (int i in ..<animationHistory.Count)
-				{
-					buffer.Add(animationHistory[i]);
-					if (i + 1 < animationHistory.Count)
-					{
-						var current = animationHistory[i];
-						var next = animationHistory[i + 1];
-						for (int x = 1; x < 100 / (pct * 100); x++)
-						{
-							GraphParameters gp = GraphParameters();
-							if (pct * x >= 1f)
-								break;
-							gp.xMin = Math.Lerp(current.xMin, next.xMin, pct * x);
-							gp.xMax = Math.Lerp(current.xMax, next.xMax, pct * x);
-							gp.yMin = Math.Lerp(current.yMin, next.yMin, pct * x);
-							gp.yMax = Math.Lerp(current.yMax, next.yMax, pct * x);
-							gp.kMax = Math.Lerp(current.kMax, next.kMax, pct * x);
-							buffer.Add(gp);
-							if (x == 9)
-							{
-								NOP!();
-							}
-						}
-					}
-				}
-
-				CopyAnimation(buffer);
-			}
-		}
-
-		public class RenderThread
-		{
-			Thread _mainThread = null ~ SafeDelete!(_);
-			bool _shouldAbort = false;
-			bool _enabled = false;
-			public bool Enabled { get { return _enabled; } set { _enabled = value; } }
-			bool _savingImage = false;
-			Image _renderedImage = null ~ SafeDelete!(_);
-			Image _bufferImage = null ~ SafeDelete!(_);
-			int64 _renderTime = -1;
-			public int64 RenderTime { get { return _renderTime; } }
-			bool _finishedRendering = false;
-			public bool finishedRendering { get { return _finishedRendering; } }
-
-			public bool IsAlive { get { return (bool)_mainThread?.IsAlive; } }
-
-			public this(Thread mainThread, bool enabled, Size2D size)
-			{
-				_enabled = enabled;
-				_mainThread = mainThread;
-
-				SDL2.Image image = new Image();
-				if (DrawUtils.CreateTexture(image, size, gEngineApp.mRenderer, .Streaming) case .Err(let err))
-				{
-					SDLError!(1);
-				}
-				_renderedImage = image;
-			}
-
-			public void StartThread()
-			{
-				_mainThread?.Start(false);
-			}
-
-			public void RequestAbort()
-			{
-				_shouldAbort = true;
-			}
-		}
-
-		public struct GraphParameters
-		{
-			public double yMin = -2.0;// Default minimum Y for the set to render.
-			public double yMax = 0.0;// Default maximum Y for the set to render.
-			public double yOffset = 0.0;// Default maximum Y for the set to render.
-			public double xMin = -2.0;// Default minimum X for the set to render.
-			public double xMax = 1.0;// Default maximum X for the set to render.
-			public double xOffset = 0;// Default maximum X for the set to render.
-			public double kMax = 50;
-			public double zoomScale = 1;// Default amount to zoom in by.
 		}
 	}
 }

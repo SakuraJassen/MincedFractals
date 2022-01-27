@@ -14,13 +14,15 @@ using System.Threading;
 using BasicEngine.HUD;
 using System.IO;
 using BasicEngine.Math;
+using BasicEngine.Options;
 namespace MincedFractals
 {
 	class Rendering : GameState
 	{
 		//private List<FractelChunkMultiThread> fcList = new List<FractelChunkMultiThread>() ~ DeleteContainerAndItems!(_);
-		private FractelChunkMultiThread fc = null ~ SafeDelete!(_);
+		private FractalChunkMultiThread fc = null ~ SafeDelete!(_);
 		private KeyboardManager kbManager = new KeyboardManager() ~ SafeDelete!(_);
+		OptionsHandler mOptionsHandler = new OptionsHandler() ~ SafeDelete!(_);
 		//private FractelChunk fc = null ~ SafeDelete!(_);
 		bool liveUpdate = true;
 
@@ -35,6 +37,7 @@ namespace MincedFractals
 		}
 
 		bool rerender = false;
+		bool saveAnimation = false;
 
 		List<DataLabel<int64>> timerLabels = new List<DataLabel<int64>>() ~ DeleteContainerAndItems!(_);
 		List<DataLabel<double>> graphDiscriptionsLabel = new List<DataLabel<double>>() ~ DeleteContainerAndItems!(_);
@@ -45,11 +48,25 @@ namespace MincedFractals
 
 		public this()
 		{
-			fc = new FractelChunkMultiThread(new .(gGameApp.mScreen.w, gGameApp.mScreen.h), -1.12, 1.12, -2.0, 0.47, 700);
+			if (!System.IO.Directory.Exists("./png"))
+			{
+				System.IO.Directory.CreateDirectory("./png");
+			}
+			if (!System.IO.Directory.Exists("./png/ani"))
+			{
+				System.IO.Directory.CreateDirectory("./png/ani");
+			}
+
+			if (!mOptionsHandler.ExistOption("saving"))
+				mOptionsHandler.WriteOption("saving", "false");
+			else
+				saveAnimation = Boolean.Parse(mOptionsHandler.ReadOption<bool>("saving").Value);
+			fc = new FractalChunkMultiThread(new .(gGameApp.mScreen.w, gGameApp.mScreen.h), -1.12, 1.12, -2.0, 0.47, 700);
 
 			setUpHud();
 
 			fc.PreperRenderImages();
+
 
 			kbManager.AddKey(.KpMinus, new (delta) =>
 				{
@@ -80,10 +97,27 @@ namespace MincedFractals
 
 			kbManager.AddKey(.Period, new (delta) =>
 				{
-					fc.mAnimationThread.CopyAnimation(fc.[Friend]undoHistory);
+					fc.mAnimationThread.StopAnimation();
+					fc.mAnimationThread.CopyGraphHistory(fc.[Friend]undoHistory);
 					fc.mAnimationThread.animationHistory.Add(fc.[Friend]currentGraphParameters);
-					fc.mAnimationThread.SmoothAnimation(0.1f);
-					fc.mAnimationThread.StartAnimation(fc);
+					//fc.mAnimationThread.SmoothAnimation(0.1f);
+					fc.mAnimationThread.SmoothAnimation(fc, 20, 1);
+					fc.mAnimationThread.StartAnimation(fc, saveAnimation);
+					Logger.Info("Start Animation");
+
+					return 20;
+				});
+
+			kbManager.AddKey(.X, new (delta) =>
+				{
+					fc.mAnimationThread.StopAnimation();
+					//fc.mAnimationThread.CopyGraphHistory(fc.[Friend]undoHistory);
+					fc.mAnimationThread.animationHistory.Clear();
+					fc.mAnimationThread.animationHistory.Add(fc.[Friend]undoHistory[0]);
+					fc.mAnimationThread.animationHistory.Add(fc.[Friend]currentGraphParameters);
+					//fc.mAnimationThread.SmoothAnimation(0.1f);
+					fc.mAnimationThread.SmoothAnimation(fc, 20, 1);
+					fc.mAnimationThread.StartAnimation(fc, saveAnimation);
 					Logger.Info("Start Animation");
 
 					return 20;
