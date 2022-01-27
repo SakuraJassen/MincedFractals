@@ -13,6 +13,7 @@ using SDL2;
 using System.Threading;
 using BasicEngine.HUD;
 using System.IO;
+using BasicEngine.Math;
 namespace MincedFractals
 {
 	class Rendering : GameState
@@ -81,7 +82,7 @@ namespace MincedFractals
 				{
 					fc.mAnimationThread.CopyAnimation(fc.[Friend]undoHistory);
 					fc.mAnimationThread.animationHistory.Add(fc.[Friend]currentGraphParameters);
-					fc.mAnimationThread.SmoothAnimation(0.01f);
+					fc.mAnimationThread.SmoothAnimation(0.1f);
 					fc.mAnimationThread.StartAnimation(fc);
 					Logger.Info("Start Animation");
 
@@ -399,7 +400,8 @@ namespace MincedFractals
 			if (holdingMouseDown)
 			{
 				SDL.SetRenderDrawColor(gGameApp.mRenderer, 255, 255, 255, 255);
-				SDL.RenderDrawRect(gGameApp.mRenderer, &zoomRect);
+				SDL.Rect* rect = scope .((int32)zoomRect.x, (int32)zoomRect.y, (int32)zoomRect.w, (int32)zoomRect.h);
+				SDL.RenderDrawRect(gGameApp.mRenderer, rect);
 				SDL.SetRenderDrawColor(gGameApp.mRenderer, 0, 0, 0, 255);
 			}
 			if (showLabels > 0)
@@ -515,59 +517,50 @@ namespace MincedFractals
 			{
 				var myPixelManager = fc.GetScreenPixelManager();
 				defer { SafeDeleteNullify!(myPixelManager); }
-				zoomRect.x = (int32)startClickPos.mX;
-				zoomRect.y = (int32)startClickPos.mY;
+				zoomRect.x = startClickPos.mX;
+				zoomRect.y = startClickPos.mY;
 				int32 mouseX = 0;
 				int32 mouseY = 0;
 				SDL.GetMouseState(&mouseX, &mouseY);
 
-				if (!kbManager.KeyDown(.LCtrl))
+				if (kbManager.KeyDown(.LShift))
 				{
-					if (kbManager.KeyDown(.LAlt))
-					{
-						zoomRect.w = Math.Abs(mouseX - (int32)startClickPos.mX) * 2;
-						zoomRect.h = Math.Abs(mouseY - (int32)startClickPos.mY) * 2;
-						zoomRect.x = (int32)startClickPos.mX - (zoomRect.w / 2);
-						zoomRect.y = (int32)startClickPos.mY - (zoomRect.h / 2);
-					}
-					else
-					{
+					zoomRect.x = (float)gGameApp.mScreen.w / 2;
+					zoomRect.y = (float)gGameApp.mScreen.h / 2;
+					zoomRect.y += 0.5d;
+				}
 
-					/*var graphH = Math.Abs(fc.[Friend]currentGraphParameters.yMax) + Math.Abs(fc.[Friend]currentGraphParameters.yMin);
-					var graphW = Math.Abs(fc.[Friend]currentGraphParameters.xMax) + Math.Abs(fc.[Friend]currentGraphParameters.xMin);*/
 
-						zoomRect.w = (mouseX - (int32)startClickPos.mX);
-					//zoomRect.h = (mouseY - (int32)startClickPos.mY) * 2;
-
-						float scale = ((float)gGameApp.mScreen.h / (float)gGameApp.mScreen.w);
-						zoomRect.h = (int32)(zoomRect.w * scale);
-
-					//float scale = ((float)graphH / (float)graphW);
-					/*if (mouseX > mouseY)
-					{
-						zoomRect.h = (int32)(zoomRect.w * scale);
-					}
-					else
-					{
-						zoomRect.w = (int32)(zoomRect.h * scale);
-					}*/
-						zoomRect.w *= 2;
-						zoomRect.h *= 2;
-						zoomRect.x = (int32)startClickPos.mX - (zoomRect.w / 2);
-						zoomRect.y = (int32)startClickPos.mY - (zoomRect.h / 2);
-						if (zoomRect.h > 0 && zoomRect.w > 0)
-							Logger.Debug((float)zoomRect.h / (float)zoomRect.w);
-					}
-				} else
+				if (kbManager.KeyDown(.LAlt))
 				{
-					zoomRect.w = mouseX - (int32)startClickPos.mX;
-					zoomRect.h = mouseY - (int32)startClickPos.mY;
+					zoomRect.w = Math.Abs(mouseX - startClickPos.mX) * 2;
+					zoomRect.h = Math.Abs(mouseY - startClickPos.mY) * 2;
+					zoomRect.x = zoomRect.x - (zoomRect.w / 2);
+					zoomRect.y = zoomRect.y - (zoomRect.h / 2);
+				}
+
+				else if (kbManager.KeyDown(.LCtrl))
+				{
+					zoomRect.w = mouseX - zoomRect.x;
+					zoomRect.h = mouseY - zoomRect.y;
+				}
+				else
+				{
+					double w = (mouseX - zoomRect.x);
+
+					float scale = ((float)gGameApp.mScreen.h / (float)gGameApp.mScreen.w);
+					double h = (w * scale);
+
+					zoomRect.w = (w * 2);
+					zoomRect.h = (h * 2);
+					zoomRect.x = (zoomRect.x - ((float)zoomRect.w / 2));
+					zoomRect.y = (zoomRect.y - ((float)zoomRect.h / 2));
 				}
 			}
 		}
 
 		Vector2D startClickPos = new Vector2D(0, 0) ~ SafeDelete!(_);
-		SDL.Rect zoomRect = SDL.Rect();
+		Rect<double> zoomRect = Rect<double>();
 		bool holdingMouseDown = false;
 		public override void MouseDown(SDL2.SDL.MouseButtonEvent evt)
 		{
@@ -596,7 +589,7 @@ namespace MincedFractals
 			holdingMouseDown = false;
 
 			const int ZOOM_THREASHOLD = 5;
-			Size2D RecSize = scope .(zoomRect.h, zoomRect.w);
+			//Size2D RecSize = scope .(zoomRect.h, zoomRect.w);
 
 			var myPixelManager = fc.GetScreenPixelManager();
 			defer { SafeDeleteNullify!(myPixelManager); }
@@ -604,20 +597,20 @@ namespace MincedFractals
 			v2d<double> bufferZoomRec = gGameApp.mCam.GetProjected(v2d<double>(zoomRect.x, zoomRect.y));
 			v2d<double> bufferZoomRec2 = gGameApp.mCam.GetProjected(v2d<double>(zoomRect.x + zoomRect.w, zoomRect.y + zoomRect.h));
 
-			if (RecSize.Width < -ZOOM_THREASHOLD)
+			if (zoomRect.w < -ZOOM_THREASHOLD)
 			{
 				Swap!(bufferZoomRec.x, bufferZoomRec2.x);
 			}
-			if (RecSize.Height < -ZOOM_THREASHOLD)
+			if (zoomRect.h < -ZOOM_THREASHOLD)
 			{
 				Swap!(bufferZoomRec.y, bufferZoomRec2.y);
 			}
 
 			var minPos = myPixelManager.GetAbsoluteMathsCoord(bufferZoomRec);
 			var maxPos = myPixelManager.GetAbsoluteMathsCoord(bufferZoomRec2);
-			var width = Math.Abs(maxPos.x) + Math.Abs(minPos.x);
+			/*var width = Math.Abs(maxPos.x) + Math.Abs(minPos.x);
 			var height = Math.Abs(maxPos.y) + Math.Abs(minPos.y);
-			Logger.Debug(height / width);
+			Logger.Debug(height / width);*/
 			/*if (kbManager.KeyDown(.LCtrl))
 			{
 				/*var scalingY = fc.[Friend]currentGraphParameters.yMax / yMax;
@@ -652,11 +645,11 @@ namespace MincedFractals
 			Logger.Debug(maxPos.x, maxPos.y);
 			Logger.Debug(evt.x - bufferZoomRec.y, evt.y - bufferZoomRec.y);
 
-			if (kbManager.KeyDown(.LShift) || evt.button == 3)//Rightclick
+			if (evt.button == 3)//Right click
 			{
 				fc.Undo();
 				fc.PreperRenderImages();
-			} else if ((RecSize.Width > ZOOM_THREASHOLD || RecSize.Width < -ZOOM_THREASHOLD) && (RecSize.Height < -ZOOM_THREASHOLD || RecSize.Height > ZOOM_THREASHOLD))
+			} else if ((zoomRect.w > ZOOM_THREASHOLD || zoomRect.w < -ZOOM_THREASHOLD) && (zoomRect.h < -ZOOM_THREASHOLD || zoomRect.h > ZOOM_THREASHOLD))
 			{
 				fc.SetGraphParameters(maxPos.y, minPos.y, minPos.x, maxPos.x);
 				fc.[Friend]currentGraphParameters.xOffset = 0;
