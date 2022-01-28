@@ -76,8 +76,8 @@ namespace MincedFractals.Entity
 				mRenderThreads.Add(new RenderThread(new Thread(new () => RenderImageByPixel(mRenderThreads[i - 1], currentGraphParameters, i)), false, mSize));
 
 			mRenderThreads[0].Enabled = true;
-			mRenderThreads[1].Enabled = false;
-			mRenderThreads[3].Enabled = false;
+			mRenderThreads[1].Enabled = true;
+			mRenderThreads[3].Enabled = true;
 
 			SafeMemberSet!(colourTable, new ColourTable(400));
 		}
