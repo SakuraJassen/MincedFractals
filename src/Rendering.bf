@@ -15,6 +15,7 @@ using BasicEngine.HUD;
 using System.IO;
 using BasicEngine.Math;
 using BasicEngine.Options;
+using MincedFractals.Entity.FractalChunk;
 namespace MincedFractals
 {
 	class Rendering : GameState
@@ -65,7 +66,7 @@ namespace MincedFractals
 
 			setUpHud();
 
-			fc.PreperRenderImages();
+			fc.StartRenderThreads();
 
 
 			kbManager.AddKey(.KpMinus, new (delta) =>
@@ -192,7 +193,7 @@ namespace MincedFractals
 
 			kbManager.AddKey(.R, new (delta) =>
 				{
-					fc.PreperRenderImages();
+					fc.StartRenderThreads();
 					return 20;
 				});
 
@@ -419,6 +420,38 @@ namespace MincedFractals
 			}
 		}
 
+		public override void HandleEvent(SDL.Event evt)
+		{
+			base.HandleEvent(evt);
+			switch (evt.type)
+			{
+			case .DropFile:
+				var dropped_filedir = scope String(evt.drop.file);
+				StreamReader sr = scope .();
+				if (sr.Open(dropped_filedir) case .Err(let err))
+				{
+					SDL.SimpleMessageBox(
+						SDL.MessageBoxFlags.Error,
+						"Error in Parsing File",
+						dropped_filedir,
+						gGameApp.mWindow);
+					return;
+				}
+				List<String> lbuffer = new List<String>();
+				for (var line in sr.Lines)
+					lbuffer.Add(new String(line.Value));
+
+				var gp = GraphParameters();
+				gp.Parse(lbuffer);
+				fc.SetGraphParameters(gp);
+				fc.StartRenderThreads();
+				DeleteContainerAndItems!(lbuffer);
+				//delete evt.drop.file;// Crash!?!?
+
+			default:
+			}
+		}
+
 		public char8* lastError;
 		public override void Draw(int dt)
 		{
@@ -531,7 +564,9 @@ namespace MincedFractals
 							SafeMemberSet!(label.mColor, new Color(64, 255, 64));*/
 
 						var str = new System.String();
-						str.AppendF("Anim({})({}/{}) : {}", threadAlive ? "Running" : "Idle", fc.mAnimationThread.[Friend]animationIndex, fc.mAnimationThread.animationHistory.Count,
+						str.AppendF("Anim({})({}/{}){} : {}", threadAlive ? "Running" : "Idle",
+							fc.mAnimationThread.[Friend]animationIndex, fc.mAnimationThread.animationHistory.Count,
+							fc.mAnimationThread.[Friend]saveAnimation ? "(Save!)" : "",
 							TimeSpan((int64) * animationLabel.[Friend]mPointer));
 
 						animationLabel.SetString(str);
@@ -543,8 +578,11 @@ namespace MincedFractals
 				{
 					animationLabel.mVisiable = false;
 				}
-				statusLabel.UpdateString(fc.RenderingDone, true);
-				statusLabel.mPos.mY = (28 * (visiableLabelCnt++ + 1));
+				if (!fc.mAnimationThread.[Friend]animationRunning)
+				{
+					statusLabel.UpdateString(fc.RenderingDone, true);
+					statusLabel.mPos.mY = (28 * (visiableLabelCnt++ + 1));
+				}
 			}
 
 			if (holdingMouseDown)
@@ -682,13 +720,13 @@ namespace MincedFractals
 			if (evt.button == 3)//Right click
 			{
 				fc.Undo();
-				fc.PreperRenderImages();
+				fc.StartRenderThreads();
 			} else if ((zoomRect.w > ZOOM_THREASHOLD || zoomRect.w < -ZOOM_THREASHOLD) && (zoomRect.h < -ZOOM_THREASHOLD || zoomRect.h > ZOOM_THREASHOLD))
 			{
 				fc.SetGraphParameters(maxPos.y, minPos.y, minPos.x, maxPos.x);
 				fc.[Friend]currentGraphParameters.xOffset = 0;
 				fc.[Friend]currentGraphParameters.yOffset = 0;
-				fc.PreperRenderImages();
+				fc.StartRenderThreads();
 			}
 
 
@@ -705,7 +743,7 @@ namespace MincedFractals
 
 			if (liveUpdate && rerender)
 			{
-				fc.PreperRenderImages();
+				fc.StartRenderThreads();
 			}
 			rerender = false;
 		}

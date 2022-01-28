@@ -57,7 +57,7 @@ namespace MincedFractals.Entity.FractalChunk
 						{
 							var basename = scope String();
 							basename.AppendF(".\\png\\ani\\{}.png", animationIndex);
-							SDLError!(mCurrentImage.SaveSurface(basename));
+							SDLError!(mCurrentImage.SaveTexture(basename, gGameApp.mRenderer));
 						}
 						if ((animationIndex) < animationHistory.Count && animationIndex >= 1)
 						{

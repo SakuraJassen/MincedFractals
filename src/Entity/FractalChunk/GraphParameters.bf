@@ -1,3 +1,5 @@
+using System.Collections;
+using System;
 namespace MincedFractals.Entity.FractalChunk
 {
 	public struct GraphParameters
@@ -10,6 +12,36 @@ namespace MincedFractals.Entity.FractalChunk
 		public double xOffset = 0;// Default maximum X for the set to render.
 		public double kMax = 50;
 		public double zoomScale = 1;// Default amount to zoom in by.
+
+		public Result<void> Parse<T>(List<T> lines) mut where StringView : operator implicit T
+		{
+			if (lines.Count < 6)
+				return .Err;
+			int cnt = 0;
+			yMin = Double.Parse(lines[cnt++]);
+			yMax = Double.Parse(lines[cnt++]);
+			xMin = Double.Parse(lines[cnt++]);
+			xMax = Double.Parse(lines[cnt++]);
+			kMax = Double.Parse(lines[cnt++]);
+			zoomScale = Double.Parse(lines[cnt++]);
+
+			return .Ok;
+		}
+
+		[Comptime]
+		public void ApplyToType(Type type)
+		{
+			Compiler.EmitTypeBody(type, "public override void ToString(String str)\n{\n");
+			for (var fieldInfo in type.GetFields())
+			{
+				if (!fieldInfo.IsInstanceField)
+					continue;
+				if (@fieldInfo.Index > 0)
+					Compiler.EmitTypeBody(type, "\tstr.Append(\", \");\n");
+				Compiler.EmitTypeBody(type, scope $"\tstr.AppendF($\"{fieldInfo.Name}={{ {fieldInfo.Name} }}\");\n");
+			}
+			Compiler.EmitTypeBody(type, "}");
+		}
 
 		public static GraphParameters operator-(GraphParameters lhs, GraphParameters rhs)
 		{

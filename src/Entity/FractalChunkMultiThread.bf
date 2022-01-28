@@ -76,8 +76,8 @@ namespace MincedFractals.Entity
 				mRenderThreads.Add(new RenderThread(new Thread(new () => RenderImageByPixel(mRenderThreads[i - 1], currentGraphParameters, i)), false, mSize));
 
 			mRenderThreads[0].Enabled = true;
-			mRenderThreads[1].Enabled = true;
-			mRenderThreads[3].Enabled = true;
+			mRenderThreads[1].Enabled = false;
+			mRenderThreads[3].Enabled = false;
 
 			SafeMemberSet!(colourTable, new ColourTable(400));
 		}
@@ -93,6 +93,10 @@ namespace MincedFractals.Entity
 			mSize = size;
 		}
 
+		public void SetGraphParameters(GraphParameters gp)
+		{
+			SetGraphParameters(gp.yMin, gp.yMax, gp.xMin, gp.xMax, gp.kMax, 1);
+		}
 		public void SetGraphParameters(double yMinimum, double yMaximum, double xMinimum, double xMaximum, double kMaximum = -1, int zoomS = 1)
 		{
 			undoHistory.Add(currentGraphParameters);
@@ -147,7 +151,7 @@ namespace MincedFractals.Entity
 			gEngineApp.Draw(image, projectedPos.mX, projectedPos.mY, 0f, gGameApp.mCam.mSize);//mPos.mX, mPos.mY, mDrawAngle);
 		}
 
-		public void PreperRenderImages()
+		public void StartRenderThreads()
 		{
 			if (mAnimationThread.[Friend]animationRunning)
 				return;
@@ -293,13 +297,13 @@ namespace MincedFractals.Entity
 						}
 						else
 						{
+//#define TRUE_COLOR
 #if TRUE_COLOR
 							double colourIndex = ((double)k) / kMax;
 							double hue = Math.Pow(colourIndex, 0.25);
-
-							color = ColourTable.ColorFromHSLA(hue, 0.9, 0.6);
+							color = ColourTable.ColorFromHSLA(0.5, 0.9, colourIndex * 0.6);
 #else
-							color = colourTable.GetColour(k + k / 2);
+							color = colourTable.GetColour(k);
 							colorLast = color;
 							kLast = k;
 #endif

@@ -188,7 +188,6 @@ namespace MincedFractals
 				}
 			}
 
-			// Create Color object from RGB values.
 			SDL2.SDL.Color color = SDL2.SDL.Color((uint8)(r * 255), (uint8)(g * 255), (uint8)(b * 255), 0xFF);
 			return color;
 		}
