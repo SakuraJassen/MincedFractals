@@ -61,7 +61,15 @@ namespace MincedFractals
 			if (!mOptionsHandler.ExistOption("saving"))
 				mOptionsHandler.WriteOption("saving", "false");
 			else
-				saveAnimation = Boolean.Parse(mOptionsHandler.ReadOption<bool>("saving").Value);
+			{
+				switch (Boolean.Parse(mOptionsHandler.ReadOption<bool>("saving").Value))
+				{
+				case .Ok(let val):
+					saveAnimation = val;
+				case .Err(let err):
+					saveAnimation = false;
+				}
+			}
 			fc = new FractalChunkMultiThread(new .(gGameApp.mScreen.w, gGameApp.mScreen.h), -1.12, 1.12, -2.0, 0.47, 700);
 
 			setUpHud();
@@ -372,7 +380,7 @@ namespace MincedFractals
 			{
 				var label = new DataLabel<double>(&fc.[Friend]currentGraphParameters.zoomScale, 4, 4 + (28 * (rowIndex++ + 1)));
 				label.[Friend]mformatString = "zoomScale: {}";
-				label.GroupId = 2;
+				label.GroupId = 1;
 				label.ForceUpdateString();
 				graphDiscriptionsLabel.Add(label);
 			}
@@ -582,13 +590,16 @@ namespace MincedFractals
 				{
 					statusLabel.UpdateString(fc.RenderingDone, true);
 					statusLabel.mPos.mY = (28 * (visiableLabelCnt++ + 1));
+					statusLabel.mVisiable = true;
+				}
+				else
+				{
+					statusLabel.mVisiable = false;
 				}
 			}
 
 			if (holdingMouseDown)
 			{
-				var myPixelManager = fc.GetScreenPixelManager();
-				defer { SafeDeleteNullify!(myPixelManager); }
 				zoomRect.x = startClickPos.mX;
 				zoomRect.y = startClickPos.mY;
 				int32 mouseX = 0;
@@ -666,8 +677,9 @@ namespace MincedFractals
 			var myPixelManager = fc.GetScreenPixelManager();
 			defer { SafeDeleteNullify!(myPixelManager); }
 
-			v2d<double> bufferZoomRec = gGameApp.mCam.GetProjected(v2d<double>(zoomRect.x, zoomRect.y));
-			v2d<double> bufferZoomRec2 = gGameApp.mCam.GetProjected(v2d<double>(zoomRect.x + zoomRect.w, zoomRect.y + zoomRect.h));
+			Rect<double> destRect = gGameApp.mCam.GetScaled(zoomRect);
+			v2d<double> bufferZoomRec = gGameApp.mCam.GetProjected(v2d<double>(destRect.x, destRect.y));
+			v2d<double> bufferZoomRec2 = gGameApp.mCam.GetProjected(v2d<double>(destRect.x + destRect.w, destRect.y + destRect.h));
 
 			if (zoomRect.w < -ZOOM_THREASHOLD)
 			{
@@ -677,7 +689,6 @@ namespace MincedFractals
 			{
 				Swap!(bufferZoomRec.y, bufferZoomRec2.y);
 			}
-
 			var minPos = myPixelManager.GetAbsoluteMathsCoord(bufferZoomRec);
 			var maxPos = myPixelManager.GetAbsoluteMathsCoord(bufferZoomRec2);
 			/*var width = Math.Abs(maxPos.x) + Math.Abs(minPos.x);
@@ -723,7 +734,11 @@ namespace MincedFractals
 				fc.StartRenderThreads();
 			} else if ((zoomRect.w > ZOOM_THREASHOLD || zoomRect.w < -ZOOM_THREASHOLD) && (zoomRect.h < -ZOOM_THREASHOLD || zoomRect.h > ZOOM_THREASHOLD))
 			{
-				fc.SetGraphParameters(maxPos.y, minPos.y, minPos.x, maxPos.x);
+				if (maxPos.y < minPos.y)
+					Swap!(maxPos.y, minPos.y);
+				if (maxPos.x < minPos.x)
+					Swap!(maxPos.x, minPos.x);
+				fc.SetGraphParameters(minPos.y, maxPos.y, minPos.x, maxPos.x);
 				fc.[Friend]currentGraphParameters.xOffset = 0;
 				fc.[Friend]currentGraphParameters.yOffset = 0;
 				fc.StartRenderThreads();

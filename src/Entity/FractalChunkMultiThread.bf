@@ -23,15 +23,10 @@ namespace MincedFractals.Entity
 		private ColourTable colourTable = null ~ SafeDelete!(_);// Colour table.
 
 		volatile private Image mCurrentImage = null;//~ SafeDelete!(_);
-		//volatile private Image[] lImages = new Image[16]() ~ DeleteContainerAndItems!(_);
 		private Size2D mSize ~ SafeDelete!(_);
 
 		public List<RenderThread> mRenderThreads = new List<RenderThread>() ~ DeleteContainerAndItems!(_);
-		public AnimationThread mAnimationThread = new AnimationThread(this) ~ SafeDelete!(_);
-		/*public List<Thread> mRenderThreads = new List<Thread>() ~ DeleteContainerAndItems!(_);
-		volatile public bool[] mThreadEnabled = null ~ SafeDelete!(_);
-		volatile private bool savingImage = false;
-		volatile private int64[] lastRenderingTime = new int64[16]() ~ SafeDelete!(_);*/
+		public AnimationThread mAnimationThread = null ~ SafeDelete!(_);
 
 		public bool RenderingDone
 		{
@@ -57,23 +52,10 @@ namespace MincedFractals.Entity
 			currentGraphParameters.zoomScale = zoomS;
 
 
-			/*for (var i in ..<lImages.Count)
-			{
-				SafeDelete!(lImages[i]);
-				SDL2.Image image = new Image();
-				if (DrawUtils.CreateTexture(image, mSize, gEngineApp.mRenderer, .Streaming) case .Err(let err))
-				{
-					SDLError!(1);
-				}
-				lImages[i] = image;
-			}*/
-			/*mThreadEnabled = new bool[9];
-			mThreadEnabled[0] = true;
-			mThreadEnabled[1] = true;
-			mThreadEnabled[3] = true;*/
-
 			for (int32 i in 1 ..< 9)
 				mRenderThreads.Add(new RenderThread(new Thread(new () => RenderImageByPixel(mRenderThreads[i - 1], currentGraphParameters, i)), false, mSize));
+
+			mAnimationThread = new AnimationThread(this);
 
 			mRenderThreads[0].Enabled = true;
 			mRenderThreads[1].Enabled = true;
@@ -82,21 +64,11 @@ namespace MincedFractals.Entity
 			SafeMemberSet!(colourTable, new ColourTable(400));
 		}
 
-		public this(Vector2D chunkPos, Size2D size, int zoomS = 1)
-		{
-			mChunkPos = chunkPos;
-			currentGraphParameters.yMin = chunkPos.mY;
-			currentGraphParameters.yMax = (chunkPos.mY);
-			currentGraphParameters.xMin = chunkPos.mX;
-			currentGraphParameters.xMax = (chunkPos.mX);
-			currentGraphParameters.zoomScale = zoomS;
-			mSize = size;
-		}
-
 		public void SetGraphParameters(GraphParameters gp)
 		{
 			SetGraphParameters(gp.yMin, gp.yMax, gp.xMin, gp.xMax, gp.kMax, 1);
 		}
+
 		public void SetGraphParameters(double yMinimum, double yMaximum, double xMinimum, double xMaximum, double kMaximum = -1, int zoomS = 1)
 		{
 			undoHistory.Add(currentGraphParameters);
@@ -115,7 +87,6 @@ namespace MincedFractals.Entity
 					xRange = absXMax - absXMin;
 
 				double pow = Math.Pow(xRange, -0.163d);
-				Logger.Debug(pow, xRange);
 				var k = 400 * pow;
 				currentGraphParameters.kMax = k;
 			}
@@ -148,13 +119,14 @@ namespace MincedFractals.Entity
 			//mCurrentImage should always be a ref to the last Image that got completely rendered.
 			if (image?.mTexture == null)
 				return;
-			gEngineApp.Draw(image, projectedPos.mX, projectedPos.mY, 0f, gGameApp.mCam.mSize);//mPos.mX, mPos.mY, mDrawAngle);
+			gEngineApp.Draw(image, projectedPos.mX, projectedPos.mY, 0f, gGameApp.mCam.mScale);//mPos.mX, mPos.mY, mDrawAngle);
 		}
 
 		public void StartRenderThreads()
 		{
 			if (mAnimationThread.[Friend]animationRunning)
 				return;
+			gGameApp.mCam.Reset();
 			for (var thread in mRenderThreads)
 			{
 				thread.RequestAbort();
@@ -195,7 +167,10 @@ namespace MincedFractals.Entity
 				return;
 			case .Ok(let retImage):
 				if (saveImage)
+				{
+//					self.SmoothImage(0.5f);
 					Volatile.Write<Image>(ref mCurrentImage, self.[Friend]_renderedImage);
+				}
 			}
 			self.[Friend]_renderTime += 1;
 			self.[Friend]_finishedRendering = true;
@@ -225,27 +200,23 @@ namespace MincedFractals.Entity
 				return .Err((void)"Thread terminated");
 			}
 
-			for (int i in ..<(int)(mSize.Width * mSize.Height))
+			Internal.MemSet(data, 0, (int)(mSize.Width * mSize.Height) * image.mSurface.format.bytesPerPixel);
+			/*for (int i in ..<(int)(mSize.Width * mSize.Height))
 			{
 				((uint32*)data)[i] = (uint32)0;
-			}
-
+			}*/
 
 			int kLast = -1;
 			SDL2.SDL.Color color;
 			SDL2.SDL.Color colorLast = .();
 
-
-			//var myPixelManager = GetScreenPixelManager(gp);
-			ComplexPoint screenBottomLeft = ComplexPoint(xMin,
-				yMin);
-			ComplexPoint screenTopRight = ComplexPoint(xMax,
-				yMax);
-			var myPixelManager = new ScreenPixelManage(gGameApp.mRenderer, screenBottomLeft, screenTopRight);
+			ComplexPoint screenBottomLeft = ComplexPoint(xMin, yMin);
+			ComplexPoint screenTopRight = ComplexPoint(xMax, yMax);
+			var myPixelManager = new ScreenPixelManage(screenBottomLeft, screenTopRight, mSize);
 			ComplexPoint xyStep = myPixelManager.GetDeltaMathsCoord(ComplexPoint(pixelStep, pixelStep));
-			double min = 1d / Math.Pow((double)10, (double)15);
-			xyStep.x = Math.Max(xyStep.x, min);
-			xyStep.y = Math.Max(xyStep.y, min);
+			double min = 1d / Math.Pow((double)10, (double)14);
+			/*xyStep.x = Math.Max(xyStep.x, min);
+			xyStep.y = Math.Max(xyStep.y, min);*/
 			SafeDeleteNullify!(myPixelManager);
 
 			Stopwatch sw = scope Stopwatch();
@@ -256,6 +227,8 @@ namespace MincedFractals.Entity
 			Logger.Debug("X", (Math.Abs(xMin) + Math.Abs(xMax)) / xyStep.x);
 			for (double y = yMin; y < yMax; y += xyStep.y)
 			{
+				if (yPix < 0)
+					continue;
 				if (self.[Friend]_shouldAbort)
 				{
 					self.[Friend]_renderTime = -1;
@@ -267,6 +240,9 @@ namespace MincedFractals.Entity
 
 				for (double x = xMin; x < xMax; x += xyStep.x)
 				{
+					if (xPix >= image.mSurface.w)
+						continue;
+
 					double cx = x;
 					double cy = y;
 
@@ -303,46 +279,19 @@ namespace MincedFractals.Entity
 							double hue = Math.Pow(colourIndex, 0.25);
 							color = ColourTable.ColorFromHSLA(0.5, 0.9, colourIndex * 0.6);
 #else
-							color = colourTable.GetColour(k);
+							color = colourTable.GetColour(k * 2);
 							colorLast = color;
 							kLast = k;
 #endif
 						}
 
-						//SDL.SetRenderDrawColor(gEngineApp.mRenderer, color.r, color.g, color.b, color.a);
-						//Logger.Debug(color.r, color.g, color.b, color.a);
-						//SDL.RenderFillRect(gEngineApp.mRenderer, scope SDL.Rect((int32)xPix, (int32)yPix, xyPixelStep, -xyPixelStep));
-						//SDL.PixelFormat* fmt = image.mSurface.format;
-						/*((uint8*)data)[pitch * yPix + xPix + 0] = color.r;
-						((uint8*)data)[pitch * yPix + xPix + 1] = color.g;//((uint32)color.r << fmt.rshift | (uint32)color.g << fmt.gshift | (uint32)color.b << fmt.bshift);
-						((uint8*)data)[pitch * yPix + xPix + 2] = color.r;//((uint32)color.r << fmt.rshift | (uint32)color.g << fmt.gshift | (uint32)color.b << fmt.bshift);
-						((uint8*)data)[pitch * yPix + xPix + 3] = color.a;//; ((uint32)color.r << fmt.rshift | (uint32)color.g << fmt.gshift | (uint32)color.b << fmt.bshift);*/
-						//((uint32*)data)[image.mSurface.w * yPix + xPix] = ((uint32)color.r << fmt.rshift | (uint32)color.g << fmt.gshift | (uint32)color.b << fmt.bshift);
-
 						if (pixelStep == 1)
 						{
 							// Pixel step is 1, set a single pixel.
-							if ((xPix < image.mSurface.w) && (yPix >= 0))
-							{
-								SetPixel((uint32*)data, image, xPix, yPix, color);
-							}
+							SetPixel((uint32*)data, image, xPix, yPix, color);
 						} else
 						{
-
-							// Pixel step is > 1, set a square of pixels.
-							/*SDL.Rect* drawRect = scope .((int32)xPix, (int32)yPix, xyPixelStep, xyPixelStep);
-							SetPixels(drawRect, color);*/
-
 							SetPixels((uint32*)data, image, xPix, yPix, pixelStep, pixelStep, color);
-							/*for (int pX = 0; pX < xyPixelStep; pX++)
-							{
-								for (int pY = 0; pY < xyPixelStep; pY++)
-								{
-									if (((xPix + pX) < image.mSurface.w) && ((yPix - pY) >= 0))
-									{
-									}
-								}
-							}*/
 						}
 					}
 					xPix += pixelStep;
@@ -404,7 +353,7 @@ namespace MincedFractals.Entity
 				currentGraphParameters.yMin / currentGraphParameters.zoomScale + currentGraphParameters.yOffset);
 			ComplexPoint screenTopRight = ComplexPoint(currentGraphParameters.xMax / currentGraphParameters.zoomScale + currentGraphParameters.xOffset,
 				currentGraphParameters.yMax / currentGraphParameters.zoomScale + currentGraphParameters.yOffset);
-			return new ScreenPixelManage(gGameApp.mRenderer, screenBottomLeft, screenTopRight);
+			return new ScreenPixelManage(screenBottomLeft, screenTopRight, mSize);
 		}
 
 		public ScreenPixelManage GetScreenPixelManager(GraphParameters gp)
@@ -413,18 +362,20 @@ namespace MincedFractals.Entity
 				gp.yMin / gp.zoomScale + gp.yOffset);
 			ComplexPoint screenTopRight = ComplexPoint(gp.xMax / gp.zoomScale + gp.xOffset,
 				gp.yMax / gp.zoomScale + gp.yOffset);
-			return new ScreenPixelManage(gGameApp.mRenderer, screenBottomLeft, screenTopRight);
+			return new ScreenPixelManage(screenBottomLeft, screenTopRight, mSize);
 		}
 
-		[Inline]
+		[Inline, DisableChecks]
 		void SetPixel(uint32* data, Image image, int x, int y, SDL.Color color)
 		{
 			SDL.PixelFormat* fmt = image.mSurface.format;
+
 			(data)[(image.mSurface.w) * y + x] = ((uint32)color.r << fmt.rshift | (uint32)color.g << fmt.gshift | (uint32)color.b << fmt.bshift) | (uint32)color.a;
 		}
 
 		SDL.Color GetPixel(int x, int y)
 		{
+			Debug.FatalError("broken");
 			SDL.PixelFormat* fmt = mCurrentImage.mSurface.format;
 			uint8 bytes_per_pixel = fmt.bytesPerPixel;
 

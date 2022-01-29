@@ -166,7 +166,7 @@ namespace MincedFractals.Entity
 			ComplexPoint screenBottomLeft = ComplexPoint(xMin, yMin);
 			ComplexPoint screenTopRight = ComplexPoint(xMax, yMax);
 
-			var myPixelManager = scope ScreenPixelManage(gGameApp.mRenderer, screenBottomLeft, screenTopRight);
+			var myPixelManager = scope ScreenPixelManage(screenBottomLeft, screenTopRight, mSize);
 
 			ComplexPoint pixelStep = ComplexPoint(xyPixelStep, xyPixelStep);
 			ComplexPoint xyStep = myPixelManager.GetDeltaMathsCoord(pixelStep);

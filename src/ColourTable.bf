@@ -33,7 +33,6 @@ namespace MincedFractals
 			{
 				double colourIndex = ((double)i) / nColour;
 				double hue = Math.Pow(colourIndex, 0.25);
-				Logger.Debug(colourIndex);
 				var color = ColorFromHSLA(hue, 0.9, 0.6);
 				colourTable[i] = color;
 				colourTable[^(i + 1)] = color;

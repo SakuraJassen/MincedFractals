@@ -8,7 +8,7 @@ namespace MincedFractals
 
 	class GameApp : BasicEngine.Engine
 	{
-		public SDLCamera mCam = new SDLCamera() ~ SafeDelete!(_);
+		public SDLCamera mCam = new SDLCamera(2) ~ SafeDelete!(_);
 
 		public static class GameRules
 		{

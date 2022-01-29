@@ -155,7 +155,7 @@ namespace MincedFractals.Entity.FractalChunk
 					var nextSize = _getSizeInPixels(manager, v2d<double>(nextPara.xMin, nextPara.yMin), v2d<double>(nextPara.xMax, nextPara.yMax));//top right 0,w
 					var sizeDiff = currentSize - nextSize;
 					var totalFrameCount = (sizeDiff.x / pixelPerSec) * fps;
-					var stepSizeY = sizeDiff.y / pixelPerSec;
+					var stepSizeY = (sizeDiff.x / pixelPerSec) * fps;
 					var pctX = 1 / totalFrameCount;
 					var pctY = 1 / stepSizeY;
 					for (int frameCnt = 1; frameCnt < totalFrameCount; frameCnt++)
@@ -165,8 +165,8 @@ namespace MincedFractals.Entity.FractalChunk
 							break;
 						gp.xMin = Math.Lerp(currentPara.xMin, nextPara.xMin, (double)(pctX * frameCnt));
 						gp.xMax = Math.Lerp(currentPara.xMax, nextPara.xMax, (double)(pctX * frameCnt));
-						gp.yMin = Math.Lerp(currentPara.yMin, nextPara.yMin, (double)(pctX * frameCnt));
-						gp.yMax = Math.Lerp(currentPara.yMax, nextPara.yMax, (double)(pctX * frameCnt));
+						gp.yMin = Math.Lerp(currentPara.yMin, nextPara.yMin, (double)(pctY * frameCnt));
+						gp.yMax = Math.Lerp(currentPara.yMax, nextPara.yMax, (double)(pctY * frameCnt));
 						gp.kMax = Math.Lerp(currentPara.kMax, nextPara.kMax, (double)(pctX * frameCnt));
 						buffer.Add(gp);
 					}

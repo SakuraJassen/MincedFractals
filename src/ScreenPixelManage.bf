@@ -22,10 +22,9 @@ namespace MincedFractals
 		/// <summary>
 		/// Constructor.
 		/// </summary>
-		/// <param name="graphics"></param>
 		/// <param name="screenBottomLeftCorner"></param>
 		/// <param name="screenTopRightCorner"></param>
-		public this(SDL2.SDL.Renderer* r, ComplexPoint screenBottomLeftCorner, ComplexPoint screenTopRightCorner)
+		public this(ComplexPoint screenBottomLeftCorner, ComplexPoint screenTopRightCorner)
 		{
 
 			// Transform from mathematical to pixel coordinates.
@@ -40,6 +39,22 @@ namespace MincedFractals
 
 			convConstY1 = gGameApp.mScreen.h * (1.0 + screenBottomLeftCorner.y / (screenTopRightCorner.y - screenBottomLeftCorner.y));
 			convConstY2 = gGameApp.mScreen.h / (screenTopRightCorner.y - screenBottomLeftCorner.y);
+		}
+
+		public this(ComplexPoint screenBottomLeftCorner, ComplexPoint screenTopRightCorner, Size2D size)//: this(screenBottomLeftCorner, screenTopRightCorner)
+		{
+
+			// Transform from mathematical to pixel coordinates.
+			//
+			// The following are long-handed calulations, now replaced with more efficient calculations
+			// using convConst** values.
+			//       this.xPixel = (int) ((graphics.VisibleClipBounds.Size.Width) / (screenTopRightCorner.x - screenBottomLeftCorner.x) * (cmplxPoint.x - screenBottomLeftCorner.x));
+			//       this.yPixel = (int) (graphics.VisibleClipBounds.Size.Height - graphics.VisibleClipBounds.Size.Height / (screenTopRightCorner.y - screenBottomLeftCorner.y) * (cmplxPoint.y - screenBottomLeftCorner.y));
+			convConstX1 = size.Width / (screenTopRightCorner.x - screenBottomLeftCorner.x);
+			convConstX2 = convConstX1 * screenBottomLeftCorner.x;
+
+			convConstY1 = size.Height * (1.0 + screenBottomLeftCorner.y / (screenTopRightCorner.y - screenBottomLeftCorner.y));
+			convConstY2 = size.Height / (screenTopRightCorner.y - screenBottomLeftCorner.y);
 		}
 
 		/// <summary>
