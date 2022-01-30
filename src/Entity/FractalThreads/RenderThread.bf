@@ -3,23 +3,31 @@ using System.Threading;
 using BasicEngine;
 using System;
 using BasicEngine.Debug;
-namespace MincedFractals.Entity.FractalChunk
+namespace MincedFractals.Entity.FractalThreads
 {
 	public class RenderThread
 	{
 		Thread _mainThread = null ~ SafeDelete!(_);
 		bool _shouldAbort = false;
+
 		bool _enabled = false;
 		public bool Enabled { get { return _enabled; } set { _enabled = value; } }
+
 		bool _savingImage = false;
 		Image _renderedImage = null ~ SafeDelete!(_);
 		Image _bufferImage = null ~ SafeDelete!(_);
+
 		int64 _renderTime = -1;
 		public int64 RenderTime { get { return _renderTime; } }
+
 		bool _finishedRendering = false;
 		public bool finishedRendering { get { return _finishedRendering; } }
 
 		public bool IsAlive { get { return (bool)_mainThread?.IsAlive; } }
+
+		/*public this(Thread mainThread, bool enabled, Size2D size, Size2D offset) : this(mainThread, enabled, size)
+		{
+		}*/
 
 		public this(Thread mainThread, bool enabled, Size2D size)
 		{

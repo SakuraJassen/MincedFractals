@@ -5,7 +5,8 @@ using System.Threading;
 using System;
 using BasicEngine.Debug;
 using BasicEngine;
-namespace MincedFractals.Entity.FractalChunk
+using MincedFractals.Math;
+namespace MincedFractals.Entity.FractalThreads
 {
 	public class AnimationThread
 	{
@@ -22,8 +23,11 @@ namespace MincedFractals.Entity.FractalChunk
 		public bool IsAlive { get { return (bool)_renderThread?.IsAlive; } }
 		SDL.Rect _targetRect = default;
 
+		FractalChunkMultiThread _fc = null ~ _ = null;
+
 		public this(FractalChunkMultiThread fc)
 		{
+			_fc = fc;
 			SafeMemberSet!(_renderThread, new RenderThread(new Thread(new () => fc.RenderImageByPixel(_renderThread, animationHistory[animationIndex++], 1, false)), false, fc.[Friend]mSize));
 		}
 
@@ -35,7 +39,7 @@ namespace MincedFractals.Entity.FractalChunk
 			SafeMemberSet!(mCurrentImage, null);
 		}
 
-		public void AnimateHistory(FractalChunkMultiThread fc, int numThread = 1)
+		public void AnimateHistory(int numThread = 1)
 		{
 			if (_renderThread != null)
 			{
@@ -62,7 +66,7 @@ namespace MincedFractals.Entity.FractalChunk
 						if ((animationIndex) < animationHistory.Count && animationIndex >= 1)
 						{
 							var next = animationHistory[animationIndex];
-							var manager = fc.GetScreenPixelManager(animationHistory[animationIndex - 1]);
+							var manager = _fc.GetScreenPixelManager(animationHistory[animationIndex - 1]);
 							defer { SafeDeleteNullify!(manager); }
 
 							var minPos = manager.GetPixelCoord(v2d<double>(next.xMin, next.yMin));// bot left
@@ -85,7 +89,8 @@ namespace MincedFractals.Entity.FractalChunk
 							return;
 						}
 
-						SafeMemberSet!(_renderThread, new RenderThread(new Thread(new () => fc.RenderImageByPixel(_renderThread, animationHistory[animationIndex++], 1, false)), false, fc.[Friend]mSize));
+						_fc.ClearPixelBuffer();
+						SafeMemberSet!(_renderThread, new RenderThread(new Thread(new () => _fc.RenderImageByPixel(_renderThread, animationHistory[animationIndex++], 1, false)), false, _fc.[Friend]mSize));
 						_renderThread.Enabled = true;
 						_renderThread.StartThread();
 						presentDelayer.Stop();
@@ -100,7 +105,7 @@ namespace MincedFractals.Entity.FractalChunk
 			}
 		}
 
-		public void StartAnimation(FractalChunkMultiThread fc, bool save = false)
+		public void StartAnimation(bool save = false)
 		{
 			if (animationHistory.Count == 0)
 				return;
@@ -113,11 +118,17 @@ namespace MincedFractals.Entity.FractalChunk
 				}
 			}
 			animationIndex = 0;
-			SafeMemberSet!(_renderThread, new RenderThread(new Thread(new () => fc.RenderImageByPixel(_renderThread, animationHistory[animationIndex++], 1, false)), false, fc.[Friend]mSize));
-			_renderThread.Enabled = true;
-			_renderThread.StartThread();
+			StartNextFrame(save);
 			animationRunning = true;
 			saveAnimation = save;
+		}
+
+		public void StartNextFrame(bool save = false)
+		{
+			_fc.ClearPixelBuffer();
+			SafeMemberSet!(_renderThread, new RenderThread(new Thread(new () => _fc.RenderImageByPixel(_renderThread, animationHistory[animationIndex++], 1, false)), false, _fc.[Friend]mSize));
+			_renderThread.Enabled = true;
+			_renderThread.StartThread();
 		}
 
 		public void CopyGraphHistory(List<GraphParameters> gp)
@@ -138,7 +149,7 @@ namespace MincedFractals.Entity.FractalChunk
 			return .(width, height);
 		}
 
-		public void SmoothAnimation(FractalChunkMultiThread fc, double pixelPerSec, double fps = 1)
+		public void SmoothAnimation(double pixelPerSec, double fps = 1)
 		{
 			List<GraphParameters> buffer = scope List<GraphParameters>();
 			for (int i in ..<animationHistory.Count)
@@ -148,7 +159,7 @@ namespace MincedFractals.Entity.FractalChunk
 				{
 					var currentPara = animationHistory[i];
 					var nextPara = animationHistory[i + 1];
-					var manager = fc.GetScreenPixelManager(currentPara);
+					var manager = _fc.GetScreenPixelManager(currentPara);
 
 					//var diff = current - next;
 					var currentSize = _getSizeInPixels(manager, v2d<double>(currentPara.xMin, currentPara.yMin), v2d<double>(currentPara.xMax, currentPara.yMax));//top right 0,w
