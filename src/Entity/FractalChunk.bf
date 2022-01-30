@@ -9,7 +9,7 @@ using System.Threading.Tasks;
 
 namespace MincedFractals.Entity
 {
-	class FractalChunkOld
+	class FractalChunk
 	{
 		Vector2D mChunkPos = null ~ SafeDelete!(_);
 

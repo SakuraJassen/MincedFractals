@@ -6,14 +6,13 @@ using System;
 using System.Collections;
 using System.Threading;
 using System.Threading.Tasks;
-using MincedFractals.Entity.FractalChunk;
+using MincedFractals.Entity.FractalThreads;
+using MincedFractals.Math;
 
 namespace MincedFractals.Entity
 {
 	class FractalChunkMultiThread
 	{
-		Vector2D mChunkPos = null ~ SafeDelete!(_);
-
 		private uint32 mDrawCycle = 0;
 		private bool autoUpdateDepth = true;
 
@@ -28,6 +27,7 @@ namespace MincedFractals.Entity
 		public List<RenderThread> mRenderThreads = new List<RenderThread>() ~ DeleteContainerAndItems!(_);
 		public AnimationThread mAnimationThread = null ~ SafeDelete!(_);
 
+		volatile private int[] pixelData = null ~ SafeDelete!(_);
 		public bool RenderingDone
 		{
 			get
@@ -41,24 +41,64 @@ namespace MincedFractals.Entity
 			}
 		}
 
-		public this(Size2D size, double yMinimum, double yMaximum, double xMinimum, double xMaximum, int32 kMaximum = 200, int zoomS = 1)
+		public this(Size2D size, double yMinimum, double yMaximum, double xMinimum, double xMaximum, int32 kMaximum = -1, int zoomS = 1)
 		{
 			mSize = size;
-			currentGraphParameters.yMin = yMinimum;
-			currentGraphParameters.yMax = yMaximum;
-			currentGraphParameters.xMin = xMinimum;
-			currentGraphParameters.xMax = xMaximum;
-			currentGraphParameters.kMax = kMaximum;
-			currentGraphParameters.zoomScale = zoomS;
+			SetGraphParameters(yMinimum, yMaximum, xMinimum, xMaximum, kMaximum, zoomS);
 
+			GraphParameters topright = .();
+			topright.yMin = yMinimum;
+			topright.yMax = 0;
+			topright.xMin = 0;
+			topright.xMax = xMaximum;
+			topright.kMax = kMaximum;
+			topright.zoomScale = zoomS;
 
+			GraphParameters botright = .();
+			botright.yMin = 0;
+			botright.yMax = yMaximum;
+			botright.xMin = 0;
+			botright.xMax = xMaximum;
+			botright.kMax = kMaximum;
+			botright.zoomScale = zoomS;
+
+			GraphParameters botleft = .();
+			botleft.yMin = 0;
+			botleft.yMax = yMaximum;
+			botleft.xMin = xMinimum;
+			botleft.xMax = 0;
+			botleft.kMax = kMaximum;
+			botleft.zoomScale = zoomS;
+
+			GraphParameters topleft = .();
+			topleft.yMin = yMinimum;
+			topleft.yMax = 0;
+			topleft.xMin = xMinimum;
+			topleft.xMax = 0;
+			topleft.kMax = kMaximum;
+			topleft.zoomScale = zoomS;
+
+			pixelData = new int[(int)(mSize.Width * mSize.Height)];
+			ClearPixelBuffer();
+
+			/*for (int32 i in 1 ..< 9)
+				mRenderThreads.Add(new RenderThread(new Thread(new () => RenderImageByPixel(mRenderThreads[i - 1], currentGraphParameters, i)), false, mSize));*/
 			for (int32 i in 1 ..< 9)
+			{
 				mRenderThreads.Add(new RenderThread(new Thread(new () => RenderImageByPixel(mRenderThreads[i - 1], currentGraphParameters, i)), false, mSize));
+			}
+			/*mRenderThreads.Add(new RenderThread(new Thread(new () => RenderImageByPixel(mRenderThreads[0], topright,
+			1)), false, mSize)); mRenderThreads.Add(new RenderThread(new Thread(new () =>
+			RenderImageByPixel(mRenderThreads[1], botright, 1)), false, mSize)); mRenderThreads.Add(new RenderThread(new
+			Thread(new () => RenderImageByPixel(mRenderThreads[2], botleft, 1)), false, mSize)); mRenderThreads.Add(new
+			RenderThread(new Thread(new () => RenderImageByPixel(mRenderThreads[3], topleft, 1)), false, mSize));*/
+
 
 			mAnimationThread = new AnimationThread(this);
 
 			mRenderThreads[0].Enabled = true;
 			mRenderThreads[1].Enabled = true;
+			mRenderThreads[2].Enabled = false;
 			mRenderThreads[3].Enabled = true;
 
 			SafeMemberSet!(colourTable, new ColourTable(400));
@@ -126,12 +166,12 @@ namespace MincedFractals.Entity
 		{
 			if (mAnimationThread.[Friend]animationRunning)
 				return;
-			gGameApp.mCam.Reset();
 			for (var thread in mRenderThreads)
 			{
 				thread.RequestAbort();
 			}
 			var cnt = 0;
+			ClearPixelBuffer();
 			while (!RenderingDone)
 			{
 				SDL.Delay(10);
@@ -179,17 +219,18 @@ namespace MincedFractals.Entity
 
 		public Result<SDL2.Image> GetRenderImage(RenderThread self, GraphParameters gp, int32 pixelStep)
 		{
-			return GetRenderImage(self, self.[Friend]_renderedImage, gp, gp.yMin / gp.zoomScale + gp.yOffset,
-				(gp.yMax) / gp.zoomScale + gp.yOffset,
-				(gp.xMin) / gp.zoomScale + gp.xOffset,
-				(gp.xMax) / gp.zoomScale + gp.xOffset,
-				(int32)(gp.kMax + (gp.zoomScale / 10)), pixelStep);
+			return GetRenderImage(self, self.[Friend]_renderedImage, gp, v2d<int>(pixelStep));
 		}
 
-		public Result<SDL2.Image> GetRenderImage(RenderThread self, Image image, GraphParameters gp, double yMin, double yMax, double xMin, double xMax, int32 kMax, int32 pixelStep)
+		public Result<SDL2.Image> GetRenderImage(RenderThread self, Image image, GraphParameters gp, v2d<int> pixelStep)
 		{
 			self.[Friend]_renderTime = 0;
 
+			double yMax = (gp.yMax) / gp.zoomScale + gp.yOffset;
+			double yMin = (gp.yMin) / gp.zoomScale + gp.yOffset;
+			double xMin = (gp.xMin) / gp.zoomScale + gp.xOffset;
+			double xMax = (gp.xMax) / gp.zoomScale + gp.xOffset;
+			int32 kMax = (int32)gp.kMax;
 			var err = SDL.LockTexture(image.mTexture, null, var data, var pitch);
 			if (err != 0)
 			{
@@ -213,8 +254,8 @@ namespace MincedFractals.Entity
 			ComplexPoint screenBottomLeft = ComplexPoint(xMin, yMin);
 			ComplexPoint screenTopRight = ComplexPoint(xMax, yMax);
 			var myPixelManager = new ScreenPixelManage(screenBottomLeft, screenTopRight, mSize);
-			ComplexPoint xyStep = myPixelManager.GetDeltaMathsCoord(ComplexPoint(pixelStep, pixelStep));
-			double min = 1d / Math.Pow((double)10, (double)14);
+			ComplexPoint xyStep = myPixelManager.GetDeltaMathsCoord(ComplexPoint(pixelStep.x, pixelStep.y));
+			//double min = 1d / Math.Pow((double)10, (double)10);
 			/*xyStep.x = Math.Max(xyStep.x, min);
 			xyStep.y = Math.Max(xyStep.y, min);*/
 			SafeDeleteNullify!(myPixelManager);
@@ -229,17 +270,17 @@ namespace MincedFractals.Entity
 			{
 				if (yPix < 0)
 					continue;
-				if (self.[Friend]_shouldAbort)
-				{
-					self.[Friend]_renderTime = -1;
-					SDL.UnlockTexture(image.mTexture);
-					return .Err((void)"Thread terminated");
-				}
 
 				int xPix = 0;
 
 				for (double x = xMin; x < xMax; x += xyStep.x)
 				{
+					if (self.[Friend]_shouldAbort)
+					{
+						self.[Friend]_renderTime = -1;
+						SDL.UnlockTexture(image.mTexture);
+						return .Err((void)"Thread terminated");
+					}
 					if (xPix >= image.mSurface.w)
 						continue;
 
@@ -251,22 +292,29 @@ namespace MincedFractals.Entity
 
 					int k = 0;
 					double modulusSquared;
-					repeat
+					if (pixelData[(int)(yPix * image.mSurface.w + xPix)] != -1)
 					{
-						double oldzkx = zkx;
-						double oldzky = zky;
+						k = pixelData[(int)(yPix * image.mSurface.w + xPix)];
+					} else
+					{
+						repeat
+						{
+							double oldzkx = zkx;
+							double oldzky = zky;
 
-						zkx = oldzkx * oldzkx - oldzky * oldzky;
-						zky = 2 * oldzkx * oldzky;
-						zkx += cx;
-						zky += cy;
-						modulusSquared = zkx * zkx + zky * zky;
+							zkx = oldzkx * oldzkx - oldzky * oldzky;
+							zky = 2 * oldzkx * oldzky;
+							zkx += cx;
+							zky += cy;
+							modulusSquared = zkx * zkx + zky * zky;
 
-						k++;
-					} while ((modulusSquared <= 4.0) && (k < kMax));
+							k++;
+						} while ((modulusSquared <= 4.0) && (k < kMax));
+					}
 
 					if (k < kMax)
 					{
+						pixelData[(int)(yPix * image.mSurface.w + xPix)] = k;
 						if (k == kLast)
 						{
 							color = colorLast;
@@ -277,7 +325,7 @@ namespace MincedFractals.Entity
 #if TRUE_COLOR
 							double colourIndex = ((double)k) / kMax;
 							double hue = Math.Pow(colourIndex, 0.25);
-							color = ColourTable.ColorFromHSLA(0.5, 0.9, colourIndex * 0.6);
+							color = ColourTable.ColorFromHSLA(hue, 0.9, 0.6);
 #else
 							color = colourTable.GetColour(k * 2);
 							colorLast = color;
@@ -285,33 +333,33 @@ namespace MincedFractals.Entity
 #endif
 						}
 
-						if (pixelStep == 1)
+						if (pixelStep.x == 1 && pixelStep.y == 1)
 						{
 							// Pixel step is 1, set a single pixel.
 							SetPixel((uint32*)data, image, xPix, yPix, color);
 						} else
 						{
-							SetPixels((uint32*)data, image, xPix, yPix, pixelStep, pixelStep, color);
+							SetPixels((uint32*)data, image, xPix, yPix, pixelStep.x, pixelStep.y, color);
 						}
 					}
-					xPix += pixelStep;
+					xPix += pixelStep.x;
 					if (sw.ElapsedMicroseconds - self.[Friend]_renderTime >= 100000)
 					{
 						self.[Friend]_renderTime = sw.ElapsedMicroseconds;
 					}
 				}
-				yPix -= pixelStep;
-				/*if (yPix < 0)
+				yPix -= pixelStep.y;
+				if (yPix < 0)
 				{
 					sw.Stop();
-					logCurrentTime(sw.ElapsedMicroseconds, pixelStep);
+					self.[Friend]_renderTime = sw.ElapsedMicroseconds;
 
 					SDL.UnlockTexture(image.mTexture);
 					return .Ok(null);
-				}*/
+				}
 			}
-
 			sw.Stop();
+
 			SDL.UnlockTexture(image.mTexture);
 			self.[Friend]_renderTime = sw.ElapsedMicroseconds;
 
@@ -408,6 +456,14 @@ namespace MincedFractals.Entity
 			uint8 alpha = (uint8)temp;
 
 			return .(red, green, blue, alpha);
+		}
+
+		public void ClearPixelBuffer()
+		{
+			for (int i in ..<(int)(mSize.Width * mSize.Height))
+			{
+				pixelData[i] = -1;
+			}
 		}
 	}
 }

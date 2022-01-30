@@ -15,7 +15,8 @@ using BasicEngine.HUD;
 using System.IO;
 using BasicEngine.Math;
 using BasicEngine.Options;
-using MincedFractals.Entity.FractalChunk;
+using MincedFractals.Entity.FractalThreads;
+using MincedFractals.Math;
 namespace MincedFractals
 {
 	class Rendering : GameState
@@ -27,7 +28,7 @@ namespace MincedFractals
 		//private FractelChunk fc = null ~ SafeDelete!(_);
 		bool liveUpdate = true;
 
-		overlayType showLabels = .reduce;
+		overlayType showLabels = .superReduce;
 		enum overlayType : int
 		{
 			off = 0,
@@ -70,7 +71,7 @@ namespace MincedFractals
 					saveAnimation = false;
 				}
 			}
-			fc = new FractalChunkMultiThread(new .(gGameApp.mScreen.w, gGameApp.mScreen.h), -1.12, 1.12, -2.0, 0.47, 700);
+			fc = new FractalChunkMultiThread(new .(gGameApp.mScreen.w, gGameApp.mScreen.h), -1.12, 1.12, -2.0, 0.47);
 
 			setUpHud();
 
@@ -110,8 +111,8 @@ namespace MincedFractals
 					fc.mAnimationThread.CopyGraphHistory(fc.[Friend]undoHistory);
 					fc.mAnimationThread.animationHistory.Add(fc.[Friend]currentGraphParameters);
 					//fc.mAnimationThread.SmoothAnimation(0.1f);
-					fc.mAnimationThread.SmoothAnimation(fc, 20, 1);
-					fc.mAnimationThread.StartAnimation(fc, saveAnimation);
+					fc.mAnimationThread.SmoothAnimation(20, 1);
+					fc.mAnimationThread.StartAnimation(saveAnimation);
 					Logger.Info("Start Animation");
 
 					return 20;
@@ -125,8 +126,8 @@ namespace MincedFractals
 					fc.mAnimationThread.animationHistory.Add(fc.[Friend]undoHistory[0]);
 					fc.mAnimationThread.animationHistory.Add(fc.[Friend]currentGraphParameters);
 					//fc.mAnimationThread.SmoothAnimation(0.1f);
-					fc.mAnimationThread.SmoothAnimation(fc, 20, 1);
-					fc.mAnimationThread.StartAnimation(fc, saveAnimation);
+					fc.mAnimationThread.SmoothAnimation(20, 1);
+					fc.mAnimationThread.StartAnimation(saveAnimation);
 					Logger.Info("Start Animation");
 
 					return 20;
@@ -512,7 +513,7 @@ namespace MincedFractals
 			base.Update(dt);
 			if (fc.mAnimationThread.[Friend]animationRunning)
 			{
-				fc.mAnimationThread.AnimateHistory(fc);
+				fc.mAnimationThread.AnimateHistory();
 			}
 			if (showLabels > 0)
 			{
