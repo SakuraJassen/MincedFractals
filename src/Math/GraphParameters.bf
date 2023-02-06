@@ -4,11 +4,11 @@ namespace MincedFractals.Math
 {
 	public struct GraphParameters
 	{
-		public double yMin = -2.0;// Default minimum Y for the set to render.
-		public double yMax = 0.0;// Default maximum Y for the set to render.
-		public double yOffset = 0.0;// Default maximum Y for the set to render.
+		public double yMin = -1.12;// Default minimum Y for the set to render.
+		public double yMax = 1.12;// Default maximum Y for the set to render., 1.12, -2.0, 0.47
+		public double yOffset = 0;// Default maximum Y for the set to render.
 		public double xMin = -2.0;// Default minimum X for the set to render.
-		public double xMax = 1.0;// Default maximum X for the set to render.
+		public double xMax = 0.47;// Default maximum X for the set to render.
 		public double xOffset = 0;// Default maximum X for the set to render.
 		public double kMax = 50;
 		public double zoomScale = 1;// Default amount to zoom in by.

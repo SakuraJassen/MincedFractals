@@ -15,13 +15,13 @@ using BasicEngine.HUD;
 using System.IO;
 using BasicEngine.Math;
 using BasicEngine.Options;
-using MincedFractals.Entity.FractalThreads;
+using MincedFractals.RenderThreads;
 using MincedFractals.Math;
+
 namespace MincedFractals
 {
 	class Rendering : GameState
 	{
-		//private List<FractelChunkMultiThread> fcList = new List<FractelChunkMultiThread>() ~ DeleteContainerAndItems!(_);
 		private FractalChunkMultiThread fc = null ~ SafeDelete!(_);
 		private KeyboardManager kbManager = new KeyboardManager() ~ SafeDelete!(_);
 		OptionsHandler mOptionsHandler = new OptionsHandler() ~ SafeDelete!(_);
@@ -45,6 +45,7 @@ namespace MincedFractals
 		List<DataLabel<double>> graphDiscriptionsLabel = new List<DataLabel<double>>() ~ DeleteContainerAndItems!(_);
 		DataLabel<bool> statusLabel = null ~ DeleteAndNullify!(_);
 		DataLabel<int64> animationLabel = null ~ DeleteAndNullify!(_);
+		DataLabel<int64> multiAnimationLabel = null ~ DeleteAndNullify!(_);
 		bool lastStatus = false;
 		Image lastStatusString = null ~ SafeDelete!(_);
 
@@ -68,15 +69,16 @@ namespace MincedFractals
 				case .Ok(let val):
 					saveAnimation = val;
 				case .Err(let err):
-					saveAnimation = false;
+					{
+						saveAnimation = false;
+						mOptionsHandler.WriteOption("saving", "false");
+					}
 				}
 			}
 			fc = new FractalChunkMultiThread(new .(gGameApp.mScreen.w, gGameApp.mScreen.h), -1.12, 1.12, -2.0, 0.47);
-
 			setUpHud();
 
 			fc.StartRenderThreads();
-
 
 			kbManager.AddKey(.KpMinus, new (delta) =>
 				{
@@ -120,14 +122,11 @@ namespace MincedFractals
 
 			kbManager.AddKey(.X, new (delta) =>
 				{
-					fc.mAnimationThread.StopAnimation();
-					//fc.mAnimationThread.CopyGraphHistory(fc.[Friend]undoHistory);
-					fc.mAnimationThread.animationHistory.Clear();
-					fc.mAnimationThread.animationHistory.Add(fc.[Friend]undoHistory[0]);
-					fc.mAnimationThread.animationHistory.Add(fc.[Friend]currentGraphParameters);
+					/*fc.mMultiAnimationThread.StopAnimation();
+					fc.mMultiAnimationThread.CopyGraphHistory(fc.[Friend]undoHistory);
 					//fc.mAnimationThread.SmoothAnimation(0.1f);
-					fc.mAnimationThread.SmoothAnimation(20, 1);
-					fc.mAnimationThread.StartAnimation(saveAnimation);
+					fc.mMultiAnimationThread.SmoothAnimation(20, 1);
+					fc.mMultiAnimationThread.StartAnimation(saveAnimation);*/
 					Logger.Info("Start Animation");
 
 					return 20;
@@ -402,31 +401,17 @@ namespace MincedFractals
 				label.ForceUpdateString();
 				animationLabel = label;
 			}
+			{
+				var label = new DataLabel<int64>(&fc.mAnimationThread.[Friend]_renderThread.[Friend]_renderTime, 4, 4 + (28 * (rowIndex++ + 1)));
+				label.GroupId = 3;
+				label.AutoUpdate = false;
+				label.ForceUpdateString();
+				multiAnimationLabel = label;
+			}
 
 			statusLabel = new DataLabel<bool>(null, 4, 4 + (28 * (rowIndex++ + 1)));
 			statusLabel.[Friend]mformatString = "Rendering Done: {}";
 			statusLabel.GroupId = 3;
-		}
-
-		private void RenderAsVideo()
-		{
-			/*uint8[] bitmap= scope uint8[fcList[0].[Friend]mImage.mSurface.pitch*fcList[0].[Friend]mImage.mSurface.h];
-			SDL.RWOps *rw = SDL2.SDL.RWFromMem(bitmap, sizeof(bitmap));
-			SDL2.SDL.SaveBMP_RW(sshot, rw, 1); */
-
-			/*var s = fcList[0].[Friend]mImage.mSurface;
-			SDL.SDL_SaveBMP()*/
-
-			//SDL.RWOps* file = SDL.RWFromFile("33_file_reading_and_writing/nums.bin", "r+b");
-			SDL.LockTexture(fc.[Friend]mCurrentImage.mTexture, null, var data, var pitch);
-			SDL.RWOps* file = SDL.RWFromMem(data, pitch * fc.[Friend]mCurrentImage.mSurface.h * 4);
-			if (file == null)
-			{
-				Logger.Warn("Warning: Unable to open file! SDL Error: ", SDL.GetError());
-
-				//Create file for writing
-				file = SDL.RWFromFile("33_file_reading_and_writing/nums.bin", "w+b");
-			}
 		}
 
 		public override void HandleEvent(SDL.Event evt)
@@ -515,6 +500,10 @@ namespace MincedFractals
 			{
 				fc.mAnimationThread.AnimateHistory();
 			}
+			else if (fc.mMultiAnimationThread.AnimationRunning)
+			{
+				fc.mMultiAnimationThread.AnimateHistory();
+			}
 			if (showLabels > 0)
 			{
 				int visiableLabelCnt = 0;
@@ -537,7 +526,7 @@ namespace MincedFractals
 				for (var i in ..<timerLabels.Count)
 				{
 					var timerLabel = timerLabels[i];
-					if (fc.mRenderThreads[i].Enabled && !fc.mAnimationThread.[Friend]animationRunning)
+					if (fc.mRenderThreads[i].Enabled && !fc.mAnimationThread.[Friend]animationRunning && !fc.mMultiAnimationThread.AnimationRunning)
 					{
 						if (timerLabel.UpdateString())
 						{
@@ -587,7 +576,37 @@ namespace MincedFractals
 				{
 					animationLabel.mVisiable = false;
 				}
-				if (!fc.mAnimationThread.[Friend]animationRunning)
+				if (animationLabel.GroupId >= (int)showLabels && fc.mMultiAnimationThread.AnimationRunning)
+				{
+					multiAnimationLabel.[Friend]mPointer = &fc.mMultiAnimationThread.[Friend]_threadList[0]._renderThread.[Friend]_renderTime;
+					if (multiAnimationLabel.UpdateString())
+					{
+						//var threadAlive = fc.mMultiAnimationThread.AnimationRunning;
+						/*if (threadAlive)
+							SafeMemberSet!(label.mColor, new Color(255, 32, 32));
+						else
+							SafeMemberSet!(label.mColor, new Color(64, 255, 64));*/
+
+						var str = new System.String();
+						str.AppendF("Anim");
+
+						for (var thread in fc.mMultiAnimationThread.[Friend]_threadList)
+						{
+							str.AppendF("({}:{}/{} : {})  ", thread._renderThread.IsAlive ? "Running" : "Idle",
+								thread.[Friend]animationIndex, thread.animationHistory.Count,
+								TimeSpan((int64)thread._renderThread.RenderTime));
+						}
+
+						multiAnimationLabel.SetString(str);
+					}
+					multiAnimationLabel.mPos.mY = (28 * (visiableLabelCnt++ + 1));
+					multiAnimationLabel.mVisiable = true;
+				}
+				else
+				{
+					multiAnimationLabel.mVisiable = false;
+				}
+				if (!fc.mAnimationThread.[Friend]animationRunning || fc.mMultiAnimationThread.AnimationRunning)
 				{
 					statusLabel.UpdateString(fc.RenderingDone, true);
 					statusLabel.mPos.mY = (28 * (visiableLabelCnt++ + 1));
@@ -649,7 +668,7 @@ namespace MincedFractals
 		public override void MouseDown(SDL2.SDL.MouseButtonEvent evt)
 		{
 			base.MouseDown(evt);
-			if (!holdingMouseDown && !fc.mAnimationThread.[Friend]animationRunning)
+			if (!holdingMouseDown && !fc.mAnimationThread.[Friend]animationRunning && !fc.mMultiAnimationThread.AnimationRunning)
 			{
 				startClickPos.Set(evt.x, evt.y);
 				holdingMouseDown = true;

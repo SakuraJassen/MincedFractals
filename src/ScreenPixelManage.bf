@@ -57,6 +57,22 @@ namespace MincedFractals
 			convConstY2 = size.Height / (screenTopRightCorner.y - screenBottomLeftCorner.y);
 		}
 
+		public this(ComplexPoint screenBottomLeftCorner, ComplexPoint screenTopRightCorner, v2d<double> size)//: this(screenBottomLeftCorner, screenTopRightCorner)
+		{
+
+			// Transform from mathematical to pixel coordinates.
+			//
+			// The following are long-handed calulations, now replaced with more efficient calculations
+			// using convConst** values.
+			//       this.xPixel = (int) ((graphics.VisibleClipBounds.Size.Width) / (screenTopRightCorner.x - screenBottomLeftCorner.x) * (cmplxPoint.x - screenBottomLeftCorner.x));
+			//       this.yPixel = (int) (graphics.VisibleClipBounds.Size.Height - graphics.VisibleClipBounds.Size.Height / (screenTopRightCorner.y - screenBottomLeftCorner.y) * (cmplxPoint.y - screenBottomLeftCorner.y));
+			convConstX1 = size.x / (screenTopRightCorner.x - screenBottomLeftCorner.x);
+			convConstX2 = convConstX1 * screenBottomLeftCorner.x;
+
+			convConstY1 = size.y * (1.0 + screenBottomLeftCorner.y / (screenTopRightCorner.y - screenBottomLeftCorner.y));
+			convConstY2 = size.y / (screenTopRightCorner.y - screenBottomLeftCorner.y);
+		}
+
 		/// <summary>
 		/// Convert from maths coordinates to pixel coordinates.
 		/// </summary>

@@ -3,7 +3,8 @@ using System.Threading;
 using BasicEngine;
 using System;
 using BasicEngine.Debug;
-namespace MincedFractals.Entity.FractalThreads
+
+namespace MincedFractals.RenderThreads
 {
 	public class RenderThread
 	{
@@ -25,10 +26,6 @@ namespace MincedFractals.Entity.FractalThreads
 
 		public bool IsAlive { get { return (bool)_mainThread?.IsAlive; } }
 
-		/*public this(Thread mainThread, bool enabled, Size2D size, Size2D offset) : this(mainThread, enabled, size)
-		{
-		}*/
-
 		public this(Thread mainThread, bool enabled, Size2D size)
 		{
 			_enabled = enabled;
@@ -42,30 +39,25 @@ namespace MincedFractals.Entity.FractalThreads
 			_renderedImage = image;
 		}
 
-		public void SmoothImage(float bias)
+		public Result<void> RenderData(int[] pixelData, v2d<int> pixelStep)
 		{
-			var renderer = gGameApp.mRenderer;
-			SDL.Texture* target = SDL.GetRenderTarget(renderer);
-			SDL.SetRenderTarget(renderer, _renderedImage.mTexture);
-			SDL.QueryTexture(_renderedImage.mTexture, var format, var access, var width, var height);
-			SDL.RenderCopy(renderer, _renderedImage.mTexture, null, null);
-			_renderedImage.mSurface = SDL.CreateRGBSurfaceWithFormat(0, width, height, 32, format);
-			SDL.RenderReadPixels(renderer, null, _renderedImage.mSurface.format.format, _renderedImage.mSurface.pixels, _renderedImage.mSurface.pitch);
+			var width = _renderedImage.mSurface.w;
+			var height = _renderedImage.mSurface.h;
 			var err = SDL.LockTexture(_renderedImage.mTexture, null, var data, var pitch);
 			if (err != 0)
 			{
 				Logger.Debug(scope String(SDL.GetError()));
+				_renderTime = -1;
 				SDL.UnlockTexture(_renderedImage.mTexture);
 				SDLError!(err);
-				return;
+				return .Err((void)"Thread terminated");
 			}
-			Internal.MemSet(data, 0, (int)(width * height) * _renderedImage.mSurface.format.bytesPerPixel);
 
+			Internal.MemSet(data, 0, (int)(width * height) * _renderedImage.mSurface.format.bytesPerPixel);
 			for (var x = 0; x < width; x++)
 			{
 				for (var y = 0; y < height; y++)
 				{
-					SDL.Color col = DrawUtils.GetPixel((uint32*)_renderedImage.mSurface.pixels, _renderedImage, x, y);
 
 					/*for (int xOffset = -1; xOffset < 2; xOffset++)
 					{
@@ -86,12 +78,13 @@ namespace MincedFractals.Entity.FractalThreads
 							}
 						}
 					}*/
-					DrawUtils.SetPixel((uint32*)data, _renderedImage, x, y, col);
+					/*var col = colourTable.GetColour(k * 2);
+					DrawUtils.SetPixel((uint32*)data, _renderedImage, x, y, col);*/
 				}
 			}
 
 			SDL.UnlockTexture(_renderedImage.mTexture);
-			SDL.SetRenderTarget(renderer, target);
+			return .Ok;
 		}
 
 		public void StartThread()

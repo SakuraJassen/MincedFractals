@@ -1,4 +1,6 @@
 using BasicEngine;
+using BasicEngine.Math;
+using System;
 namespace MincedFractals
 {
 	static

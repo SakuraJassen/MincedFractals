@@ -6,11 +6,14 @@ using System;
 using BasicEngine.Debug;
 using BasicEngine;
 using MincedFractals.Math;
-namespace MincedFractals.Entity.FractalThreads
+using MincedFractals.Entity;
+
+namespace MincedFractals.RenderThreads
 {
 	public class AnimationThread
 	{
 		RenderThread _renderThread = null ~ SafeDelete!(_);
+		const int NumRenderThreads = 4;
 		int animationIndex = 0;
 		bool animationRunning = false;
 		bool saveAnimation = false;
@@ -28,7 +31,7 @@ namespace MincedFractals.Entity.FractalThreads
 		public this(FractalChunkMultiThread fc)
 		{
 			_fc = fc;
-			SafeMemberSet!(_renderThread, new RenderThread(new Thread(new () => fc.RenderImageByPixel(_renderThread, animationHistory[animationIndex++], 1, false)), false, fc.[Friend]mSize));
+			SafeMemberSet!(_renderThread, new RenderThread(new Thread(new () => fc.RenderImageByPixel(_renderThread, animationHistory[animationIndex++], v2d<int>(1), .(0), .(0), false)), false, fc.[Friend]mSize));
 		}
 
 		public void StopAnimation()
@@ -39,7 +42,7 @@ namespace MincedFractals.Entity.FractalThreads
 			SafeMemberSet!(mCurrentImage, null);
 		}
 
-		public void AnimateHistory(int numThread = 1)
+		public void AnimateHistory()
 		{
 			if (_renderThread != null)
 			{
@@ -90,7 +93,7 @@ namespace MincedFractals.Entity.FractalThreads
 						}
 
 						_fc.ClearPixelBuffer();
-						SafeMemberSet!(_renderThread, new RenderThread(new Thread(new () => _fc.RenderImageByPixel(_renderThread, animationHistory[animationIndex++], 1, false)), false, _fc.[Friend]mSize));
+						SafeMemberSet!(_renderThread, new RenderThread(new Thread(new () => _fc.RenderImageByPixel(_renderThread, animationHistory[animationIndex++], v2d<int>(1), .(0), .(0), false)), false, _fc.[Friend]mSize));
 						_renderThread.Enabled = true;
 						_renderThread.StartThread();
 						presentDelayer.Stop();
@@ -126,7 +129,7 @@ namespace MincedFractals.Entity.FractalThreads
 		public void StartNextFrame(bool save = false)
 		{
 			_fc.ClearPixelBuffer();
-			SafeMemberSet!(_renderThread, new RenderThread(new Thread(new () => _fc.RenderImageByPixel(_renderThread, animationHistory[animationIndex++], 1, false)), false, _fc.[Friend]mSize));
+			SafeMemberSet!(_renderThread, new RenderThread(new Thread(new () => _fc.RenderImageByPixel(_renderThread, animationHistory[animationIndex++], v2d<int>(1), v2d<int>(0), .(0), false)), false, _fc.[Friend]mSize));
 			_renderThread.Enabled = true;
 			_renderThread.StartThread();
 		}
